@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-black text-white p-8">
+    <nav class="flex justify-between items-center mb-10">
+        <div class="flex gap-8">
+            <a href="/" class="text-zinc-500">DASHBOARD</a>
+            <a href="/tickets" class="text-red-600 font-bold border-b-2 border-red-600">TICKET DATABASE</a>
+        </div>
+    </nav>
+
+    <div class="bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-zinc-800 text-zinc-400 text-xs uppercase">
+                <tr>
+                    <th class="p-4">ID</th>
+                    <th class="p-4">Category</th>
+                    <th class="p-4">Priority</th>
+                    <th class="p-4">Status</th>
+                    <th class="p-4">Agent</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function loadTable() {
+            const res = await fetch('/api/all_tickets');
+            const data = await res.json();
+            document.getElementById('table-body').innerHTML = data.map(t => `
+                <tr class="border-b border-white/5 hover:bg-white/5 transition">
+                    <td class="p-4 font-mono font-bold">${t.Ticket_ID}</td>
+                    <td class="p-4 text-zinc-400">${t.Category}</td>
+                    <td class="p-4"><span class="${t.Priority=='Critical' ? 'text-red-500':'text-white'}">${t.Priority}</span></td>
+                    <td class="p-4 text-xs font-bold">${t.Status}</td>
+                    <td class="p-4 text-zinc-400">${t.Assigned_To}</td>
+                </tr>
+            `).join('');
+        }
+        loadTable();
+    </script>
+</body>
+</html>

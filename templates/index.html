@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body { background: #050505; color: white; font-family: sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(220, 38, 38, 0.2); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-7xl mx-auto">
+        <nav class="flex justify-between items-center mb-10 border-b border-white/5 pb-4">
+            <div class="flex gap-6">
+                <a href="/dashboard" class="text-red-600 font-bold border-b-2 border-red-600">DASHBOARD</a>
+                <a href="/manage" class="text-zinc-500 hover:text-white">MANAGE</a>
+            </div>
+            <a href="/logout" class="text-xs bg-zinc-800 px-3 py-1 rounded">LOGOUT</a>
+        </nav>
+
+        <div class="flex justify-between items-end mb-8">
+            <div>
+                <h1 class="text-4xl font-black italic">PERFORMANCE <span class="text-red-600">2026</span></h1>
+                <p id="sync-clock" class="text-[10px] font-mono text-zinc-500 mt-2 tracking-widest uppercase">Initializing...</p>
+            </div>
+            <button onclick="refreshData()" class="bg-red-600 px-6 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-all">Refresh Data</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="glass p-6 rounded-3xl text-center">
+                <p class="text-[10px] text-zinc-500 uppercase">Total Tickets</p>
+                <h2 id="kpi-total" class="text-4xl font-bold mt-2">--</h2>
+            </div>
+            <div class="glass p-6 rounded-3xl text-center border-b-4 border-red-600">
+                <p class="text-[10px] text-red-500 uppercase">Open Issues</p>
+                <h2 id="kpi-open" class="text-4xl font-bold mt-2">--</h2>
+            </div>
+            <div class="glass p-6 rounded-3xl text-center">
+                <p class="text-[10px] text-zinc-500 uppercase">Critical P1</p>
+                <h2 id="kpi-critical" class="text-4xl font-bold mt-2 text-red-500">--</h2>
+            </div>
+            <div class="glass p-6 rounded-3xl text-center">
+                <p class="text-[10px] text-zinc-500 uppercase">Avg Resolution</p>
+                <h2 id="kpi-avg" class="text-4xl font-bold mt-2">--</h2>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 glass p-8 rounded-[2rem]">
+                <canvas id="trendChart" height="120"></canvas>
+            </div>
+            <div class="glass p-8 rounded-[2rem]">
+                <h3 class="text-xs font-bold text-zinc-500 uppercase mb-4">Activity Log</h3>
+                <div id="activity-log" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let myChart;
+
+        async function refreshData() {
+            try {
+                console.log("Fetching stats...");
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                console.log("Data loaded:", data);
+
+                // UI Updates
+                document.getElementById('kpi-total').innerText = data.stats.total;
+                document.getElementById('kpi-open').innerText = data.stats.open;
+                document.getElementById('kpi-critical').innerText = data.stats.critical;
+                document.getElementById('kpi-avg').innerText = data.stats.avg_res + "h";
+                document.getElementById('sync-clock').innerText = "LIVE @ " + data.sync_time;
+
+                // Log Update
+                const log = document.getElementById('activity-log');
+                log.innerHTML = data.recent.length > 0 ? data.recent.map(t => `
+                    <div class="flex justify-between border-b border-white/5 pb-2">
+                        <span class="text-xs font-mono font-bold">${t.Ticket_ID}</span>
+                        <span class="text-[10px] text-zinc-500">${t.Status}</span>
+                    </div>
+                `).join('') : '<p class="text-zinc-600 text-xs text-center">No recent activity</p>';
+
+                // Chart Update
+                const ctx = document.getElementById('trendChart').getContext('2d');
+                if(myChart) myChart.destroy();
+                myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.trend.labels,
+                        datasets: [{ data: data.trend.values, borderColor: '#dc2626', tension: 0.4, fill: true, backgroundColor: 'rgba(220,38,38,0.1)' }]
+                    },
+                    options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#111' } } } }
+                });
+
+            } catch (err) {
+                console.error("Critical Error:", err);
+                document.getElementById('sync-clock').innerText = "CONNECTION FAILED";
+            }
+        }
+
+        refreshData();
+        setInterval(refreshData, 15000);
+    </script>
+</body>
+</html>
