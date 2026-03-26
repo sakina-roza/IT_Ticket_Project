@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #050505; color: white; font-family: sans-serif; }
+        .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="p-6">
+<div class="max-w-4xl mx-auto">
+    {% include 'nav.html' %}
+
+    <div class="mb-12 text-center">
+        <div class="w-32 h-32 bg-red-600 rounded-full mx-auto mb-6 flex items-center justify-center text-5xl font-black text-white shadow-2xl shadow-red-600/20 uppercase">
+            {{ current_user.name[0] if current_user.name else '?' }}
+        </div>
+        <h1 class="text-4xl font-black italic uppercase italic">{{ current_user.name }}</h1>
+        <p class="text-zinc-500 font-mono tracking-widest text-xs uppercase mt-2">{{ current_user.role }} • {{ current_user.email }}</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- ACCOUNT SETTINGS -->
+        <div class="glass p-10 rounded-[3rem]">
+            <h2 class="text-xs font-bold text-red-600 uppercase tracking-widest mb-8">Account Settings</h2>
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-[10px] text-zinc-500 uppercase font-bold mb-2">Display Name</label>
+                    <input type="text" value="{{ current_user.name }}" class="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-sm focus:border-red-600/50 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-zinc-500 uppercase font-bold mb-2">Email Address</label>
+                    <input type="text" value="{{ current_user.email }}" disabled class="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-sm opacity-50 cursor-not-allowed">
+                </div>
+                <button class="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition-all uppercase text-[10px] tracking-widest">Update Profile</button>
+            </div>
+        </div>
+
+        <!-- NOTIFICATIONS -->
+        <div class="glass p-10 rounded-[3rem]">
+            <h2 class="text-xs font-bold text-red-600 uppercase tracking-widest mb-8">Preferences</h2>
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-bold">Email Notifications</p>
+                        <p class="text-[10px] text-zinc-500">Receive alerts for SLA breaches</p>
+                    </div>
+                    <div class="w-12 h-6 bg-red-600 rounded-full cursor-pointer relative">
+                        <div class="w-4 h-4 bg-white rounded-full absolute top-1 right-1"></div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-bold">Theme</p>
+                        <p class="text-[10px] text-zinc-500">Current: Command Center Dark</p>
+                    </div>
+                </div>
+                <div class="pt-6 border-t border-white/5">
+                    <button class="w-full border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white font-bold py-3 rounded-xl transition-all uppercase text-[10px] tracking-widest">Change Password</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

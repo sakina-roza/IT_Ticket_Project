@@ -59,6 +59,11 @@
             <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Description</label>
             <textarea id="ct-desc" rows="4" placeholder="Describe your issue in detail..."
                 class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-zinc-300 transition-colors resize-none"></textarea>
+            <div class="mt-2 flex justify-end">
+                <button onclick="autoClassify()" class="text-[9px] font-bold text-red-500 hover:text-red-400 uppercase tracking-widest flex items-center gap-2">
+                    <span>✨ AUTO-CLASSIFY</span>
+                </button>
+            </div>
         </div>
 
         <button onclick="submitTicket()"
@@ -108,6 +113,22 @@
         const t = document.getElementById('toast');
         t.textContent = msg; t.className = `toast ${type} show`;
         setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    async function autoClassify() {
+        const text = document.getElementById('ct-desc').value;
+        if (!text) return;
+        try {
+            const res = await fetch('/api/classify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            const data = await res.json();
+            if (data.category) {
+                document.getElementById('ct-category').value = data.category;
+            }
+        } catch (e) { console.error(e); }
     }
 
     async function submitTicket() {

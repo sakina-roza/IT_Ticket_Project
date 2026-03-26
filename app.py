@@ -1,6 +1,6 @@
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session, Response
 import pandas as pd
-import os, io, json, random
+import os, io, json, random, re, threading, smtplib, sqlite3
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -10,6 +10,23 @@ EXCEL_FILE = 'IT_Ticket_Performance_Data.xlsx'
 USERS_FILE = 'users.json'
 
 SLA_HOURS = {'Critical': 4, 'High': 8, 'Medium': 24, 'Low': 72}
+COMMENTS_FILE = 'comments.json'
+
+# Email settings (can be moved to .env)
+SMTP_HOST = os.environ.get('SMTP_HOST', '')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
+SMTP_USER = os.environ.get('SMTP_USER', '')
+SMTP_PASS = os.environ.get('SMTP_PASS', '')
+SMTP_FROM = os.environ.get('SMTP_FROM', '')
+
+CATEGORY_KEYWORDS = {
+    'Network':            ['network', 'vpn', 'wifi', 'internet', 'dns', 'lan', 'firewall', 'bandwidth'],
+    'Access Management':  ['password', 'login', 'access', 'account', 'permission', 'authentication', 'auth', 'locked'],
+    'Hardware':           ['printer', 'scanner', 'hardware', 'laptop', 'computer', 'monitor', 'keyboard', 'mouse', 'device'],
+    'Software':           ['software', 'install', 'update', 'crash', 'error', 'bug', 'application', 'app', 'patch'],
+    'Email':              ['email', 'outlook', 'office', 'mailbox', 'teams', 'calendar'],
+    'Infrastructure':     ['server', 'database', 'storage', 'backup', 'cloud', 'vm', 'virtual'],
+}
 
 # ── User helpers ──────────────────────────────────────────────────────────────
 
@@ -43,6 +60,32 @@ def current_user_info():
 def is_admin():
     u = current_user_info()
     return u and u["role"] == "admin"
+
+def classify_ticket(text_input):
+    lower = text_input.lower()
+    for cat, kws in CATEGORY_KEYWORDS.items():
+        for kw in kws:
+            if kw in lower: return cat
+    return 'General'
+
+def get_comments():
+    if not os.path.exists(COMMENTS_FILE): return {}
+    with open(COMMENTS_FILE) as f: return json.load(f)
+
+def save_comments(comments):
+    with open(COMMENTS_FILE, 'w') as f: json.dump(comments, f, indent=2)
+
+def send_email_async(to_addr, subject, body):
+    if not SMTP_HOST or not SMTP_USER: return
+    def _send():
+        try:
+            msg = f"Subject: {subject}\n\n{body}"
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASS)
+                server.sendmail(SMTP_FROM or SMTP_USER, [to_addr], msg)
+        except Exception as e: print(f"Email error: {e}")
+    threading.Thread(target=_send, daemon=True).start()
 
 # ── Context processor: injects user info into every template ──────────────────
 @app.context_processor
@@ -166,6 +209,30 @@ def manage():
     if 'user' not in session: return redirect(url_for('login'))
     if not is_admin():        return redirect(url_for('my_tickets'))
     return render_template('manage.html')
+
+@app.route('/sql')
+def sql_page():
+    if 'user' not in session or not is_admin(): return redirect(url_for('login'))
+    return render_template('sql_query.html')
+
+@app.route('/analytics')
+def analytics_page():
+    if 'user' not in session or not is_admin(): return redirect(url_for('login'))
+    return render_template('analytics.html')
+
+@app.route('/profile')
+def profile_page():
+    if 'user' not in session: return redirect(url_for('login'))
+    return render_template('profile.html')
+
+@app.route('/tickets/<ticket_id>')
+def ticket_detail(ticket_id):
+    if 'user' not in session: return redirect(url_for('login'))
+    # Check if ticket exists
+    df = get_safe_data()
+    mask = df['Ticket_ID'].astype(str).str.strip() == ticket_id.strip()
+    if not mask.any(): return redirect(url_for('tickets'))
+    return render_template('ticket_detail.html', tid=ticket_id)
 
 # User routes
 @app.route('/create_ticket')
@@ -404,8 +471,11 @@ def add_ticket():
         'Assigned_To': data['Assigned_To'].strip(),
         'Created_Date': datetime.now().strftime('%Y-%m-%d'),
         'Resolution_Time_Hours': data.get('Resolution_Time_Hours', ''),
-        'Created_By': session.get('user', '')
+        'Created_By': session.get('user', ''),
+        'Description': data.get('Description', '').strip()
     }
+    if 'Description' not in df.columns:
+        df['Description'] = ''
     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df.to_excel(EXCEL_FILE, index=False)
     return jsonify({"success": True})
@@ -448,6 +518,64 @@ def notifications():
                            "priority": str(row.get('Priority','')),
                            "time": str(row.get('Created_Date',''))})
     return jsonify(notifs[:10])
+
+@app.route('/api/classify', methods=['POST'])
+def classify_api():
+    data = request.json or {}
+    text_input = data.get('text', '')
+    return jsonify({'category': classify_ticket(text_input)})
+
+@app.route('/api/tickets/<ticket_id>/comments', methods=['GET', 'POST'])
+def ticket_comments(ticket_id):
+    comments = get_comments()
+    if request.method == 'POST':
+        data = request.json or {}
+        body = data.get('body', '').strip()
+        if not body: return jsonify({"error": "Empty comment"}), 400
+        
+        c_list = comments.get(ticket_id, [])
+        c_list.append({
+            "author": session.get('user', 'Unknown'),
+            "body": body,
+            "time": datetime.now().strftime('%Y-%m-%d %H:%M')
+        })
+        comments[ticket_id] = c_list
+        save_comments(comments)
+        return jsonify({"success": True})
+    
+    return jsonify(comments.get(ticket_id, []))
+
+@app.route('/api/sql', methods=['POST'])
+def run_sql():
+    if not is_admin(): return jsonify({"error": "Unauthorized"}), 403
+    data = request.json or {}
+    query = data.get('query', '').strip()
+    if not query: return jsonify({"error": "Empty query"}), 400
+    
+    # Safety check: Only SELECT allowed
+    if not re.search(r'^\s*SELECT', query, re.IGNORECASE):
+        return jsonify({"error": "Only SELECT queries are allowed for safety."}), 403
+    
+    try:
+        df = get_safe_data()
+        # Create in-memory SQLite from Excel data
+        conn = sqlite3.connect(':memory:')
+        df.to_sql('tickets', conn, index=False)
+        
+        # Also include users for more interesting queries
+        users_df = pd.DataFrame([{"email": k, "name": v["name"], "role": v["role"]} 
+                               for k, v in get_users().items()])
+        users_df.to_sql('users', conn, index=False)
+
+        # Run query
+        result_df = pd.read_sql_query(query, conn)
+        return jsonify({
+            "columns": result_df.columns.tolist(),
+            "rows": result_df.fillna('').values.tolist(),
+            "count": len(result_df)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

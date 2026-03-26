@@ -79,13 +79,19 @@
                     <th class="p-4">Agent</th>
                     <th class="p-4">SLA</th>
                     <th class="p-4">Res. (h)</th>
+                    <th class="p-4 text-right">Actions</th>
                 </tr>
             </thead>
             <tbody id="table-body"></tbody>
         </table>
         <div id="table-empty" class="hidden p-10 text-center text-zinc-600 text-sm">No tickets match the current filters.</div>
     </div>
-    <div id="table-count" class="mt-3 text-xs text-zinc-600 font-mono"></div>
+    
+    <!-- PAGINATION -->
+    <div class="flex justify-between items-center mt-6">
+        <div id="table-count" class="text-xs text-zinc-600 font-mono italic"></div>
+        <div id="pagination" class="flex gap-2"></div>
+    </div>
 
 </div>
 
@@ -130,39 +136,68 @@
         updateBulkBar();
     }
 
+    let currentPage = 1;
+    const pageSize = 10;
+
     function renderTable() {
         const tbody = document.getElementById('table-body');
         const empty = document.getElementById('table-empty');
         const count = document.getElementById('table-count');
+        const pagin = document.getElementById('pagination');
         document.getElementById('select-all').checked = false;
 
         if (!allData || allData.length === 0) {
             tbody.innerHTML = '';
             empty.classList.remove('hidden');
             count.textContent = '';
+            pagin.innerHTML = '';
             return;
         }
         empty.classList.add('hidden');
-        count.textContent = `Showing ${allData.length} ticket${allData.length !== 1 ? 's' : ''}`;
+        
+        const total = allData.length;
+        const totalPages = Math.ceil(total / pageSize);
+        if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+        
+        const start = (currentPage - 1) * pageSize;
+        const end   = Math.min(start + pageSize, total);
+        const pageData = allData.slice(start, end);
 
-        tbody.innerHTML = allData.map(t => {
+        count.textContent = `Showing ${start+1}-${end} of ${total} records`;
+
+        tbody.innerHTML = pageData.map(t => {
             const slaClass = SLA_COLOR[t.SLA_Status] || 'text-zinc-600';
             const slaLabel = SLA_LABEL[t.SLA_Status] || '⚪ N/A';
             const priClass = PRI_COLOR[t.Priority]   || 'text-white';
             const chk      = selectedIds.has(String(t.Ticket_ID)) ? 'checked' : '';
             return `
-                <tr class="border-b border-white/5 hover:bg-white/5 transition">
+                <tr class="border-b border-white/5 hover:bg-white/5 transition group">
                     <td class="p-4"><input type="checkbox" value="${t.Ticket_ID}" ${chk} onchange="toggleRow(this)" class="accent-red-600"></td>
-                    <td class="p-4 font-mono font-bold text-xs">${t.Ticket_ID || '--'}</td>
+                    <td class="p-4 font-mono font-bold text-xs"><a href="/tickets/${t.Ticket_ID}" class="hover:text-red-500 transition-colors">${t.Ticket_ID || '--'}</a></td>
                     <td class="p-4 text-zinc-400 text-xs">${t.Category || '--'}</td>
                     <td class="p-4 text-xs font-bold ${priClass}">${t.Priority || '--'}</td>
                     <td class="p-4 text-xs">${t.Status || '--'}</td>
                     <td class="p-4 text-zinc-400 text-xs">${t.Assigned_To || '--'}</td>
                     <td class="p-4 text-xs font-bold ${slaClass}">${slaLabel}</td>
                     <td class="p-4 text-xs text-zinc-400">${t.Resolution_Time_Hours !== '' ? t.Resolution_Time_Hours : '--'}</td>
+                    <td class="p-4 text-right">
+                        <a href="/tickets/${t.Ticket_ID}" class="text-[9px] font-black uppercase text-zinc-600 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100 p-2">Details →</a>
+                    </td>
                 </tr>
             `;
         }).join('');
+
+        // Render pagination buttons
+        pagin.innerHTML = '';
+        if (totalPages > 1) {
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.innerText = i;
+                btn.className = `w-8 h-8 rounded-lg text-[10px] font-black transition-all ${i === currentPage ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-500 hover:bg-zinc-800'}`;
+                btn.onclick = () => { currentPage = i; renderTable(); };
+                pagin.appendChild(btn);
+            }
+        }
     }
 
     function toggleRow(cb) {

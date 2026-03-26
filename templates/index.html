@@ -20,8 +20,13 @@
 <body class="p-6">
 <div class="max-w-7xl mx-auto">
 
-    {% set active = 'dashboard' %}
     {% include 'nav.html' %}
+
+    <!-- SLA ALERTS -->
+    <div id="sla-banner" class="hidden mb-6 bg-red-600/10 border border-red-600/30 rounded-2xl p-4 flex items-center gap-4 animate-pulse">
+        <span class="text-2xl">⚠️</span>
+        <p class="text-xs font-bold text-red-500 uppercase tracking-widest" id="sla-banner-text">Loading alerts...</p>
+    </div>
 
     <!-- HEADER -->
     <div class="flex justify-between items-end mb-6">
@@ -192,6 +197,14 @@
                 document.getElementById('sla-on').innerText     = data.sla.on_track;
                 document.getElementById('sla-near').innerText   = data.sla.near_breach;
                 document.getElementById('sla-breach').innerText = data.sla.breached;
+                
+                const banner = document.getElementById('sla-banner');
+                if (data.sla.breached > 0) {
+                    banner.classList.remove('hidden');
+                    document.getElementById('sla-banner-text').innerText = `CRITICAL: ${data.sla.breached} ticket(s) have breached SLA! Immediate attention required.`;
+                } else {
+                    banner.classList.add('hidden');
+                }
             }
             if (data.insights) {
                 document.getElementById('ins-today').innerText  = data.insights.tickets_today;

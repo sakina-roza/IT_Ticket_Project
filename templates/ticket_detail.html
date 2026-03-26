@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #050505; color: white; font-family: sans-serif; }
+        .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); backdrop-filter: blur(10px); }
+        .comment-item { border-left: 2px solid #333; transition: border-color 0.2s; }
+        .comment-item:hover { border-color: #dc2626; }
+    </style>
+</head>
+<body class="p-6">
+<div class="max-w-5xl mx-auto">
+    {% include 'nav.html' %}
+
+    <div class="mb-10 flex justify-between items-start">
+        <div>
+            <a href="/tickets" class="text-[10px] font-bold text-zinc-600 hover:text-red-500 uppercase tracking-widest transition-colors mb-4 inline-block">← Back to Gallery</a>
+            <h1 class="text-5xl font-black italic uppercase" id="ticket-id">{{ tid }}</h1>
+            <div class="flex gap-4 mt-4">
+                <span id="badge-status" class="px-3 py-1 bg-zinc-800 rounded-full text-[10px] uppercase font-bold text-zinc-400">Loading...</span>
+                <span id="badge-priority" class="px-3 py-1 bg-zinc-800 rounded-full text-[10px] uppercase font-bold text-zinc-400">Loading...</span>
+            </div>
+        </div>
+        <div id="sla-box" class="hidden glass px-6 py-4 rounded-2xl text-center border-red-600/40 animate-pulse">
+            <p class="text-red-500 text-[10px] font-black uppercase tracking-tighter">SLA BREACHED</p>
+            <p class="text-zinc-500 text-[9px] uppercase mt-1">Immediate focus needed</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- DETAILS -->
+        <div class="lg:col-span-2 space-y-8">
+            <div class="glass p-10 rounded-[3rem]">
+                <h2 class="text-xs font-bold text-red-600 uppercase tracking-widest mb-6 border-b border-white/5 pb-4">Classification Details</h2>
+                <div class="grid grid-cols-2 gap-8">
+                    <div>
+                        <p class="text-[9px] text-zinc-500 uppercase font-black tracking-widest mb-1">Category</p>
+                        <p id="det-category" class="text-xl font-bold italic">--</p>
+                    </div>
+                    <div>
+                        <p class="text-[9px] text-zinc-500 uppercase font-black tracking-widest mb-1">Assigned To</p>
+                        <p id="det-assignee" class="text-xl font-bold italic">--</p>
+                    </div>
+                    <div>
+                        <p class="text-[9px] text-zinc-500 uppercase font-black tracking-widest mb-1">Created Date</p>
+                        <p id="det-date" class="font-mono text-zinc-400">--</p>
+                    </div>
+                    <div>
+                        <p class="text-[9px] text-zinc-500 uppercase font-black tracking-widest mb-1">Created By</p>
+                        <p id="det-by" class="font-mono text-zinc-400">--</p>
+                    </div>
+                </div>
+                <div class="mt-10">
+                    <p class="text-[9px] text-zinc-500 uppercase font-black tracking-widest mb-2">Description / Payload</p>
+                    <div id="det-desc" class="bg-black/50 p-6 rounded-2xl border border-white/5 text-zinc-400 text-sm leading-relaxed italic">
+                        No description provided.
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMMENTS -->
+            <div class="glass p-10 rounded-[3rem]">
+                <h2 class="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-8">Communication Logs</h2>
+                <div id="comments-list" class="space-y-6 mb-10">
+                    <!-- Loaded dynamically -->
+                </div>
+                <div class="relative group">
+                    <textarea id="comment-input" class="w-full bg-zinc-900 border border-white/5 rounded-2xl p-6 text-sm outline-none focus:border-red-600/30 transition-all min-h-[100px]" placeholder="Add to the conversation..."></textarea>
+                    <button onclick="postComment()" class="absolute bottom-4 right-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all scale-90 opacity-0 group-focus-within:opacity-100 group-focus-within:scale-100">Post Update</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SIDEBAR ACTIONS -->
+        <div class="space-y-6">
+            <div class="glass p-8 rounded-[2.5rem]">
+                <h3 class="text-[10px] font-bold text-zinc-600 uppercase mb-6 tracking-widest">Workflow Actions</h3>
+                <div class="space-y-3">
+                    <button class="w-full bg-zinc-800 hover:bg-zinc-700 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all">Assign to Me</button>
+                    <button class="w-full bg-zinc-800 hover:bg-zinc-700 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all">Escalate to L2</button>
+                    <button class="w-full bg-red-600/10 hover:bg-red-600 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-white border border-red-600/20 transition-all">Close Ticket</button>
+                </div>
+            </div>
+            
+            <div class="glass p-8 rounded-[2.5rem] opacity-40">
+                <h3 class="text-[10px] font-bold text-zinc-600 uppercase mb-4 tracking-widest">Audit Trail</h3>
+                <div class="text-[9px] font-mono text-zinc-500 space-y-2">
+                    <p>• Created by System</p>
+                    <p>• Categorized as <span class="text-red-500">Software</span></p>
+                    <p>• Priority set to <span class="text-red-500">High</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ticketId = '{{ tid }}';
+
+    async function loadTicket() {
+        try {
+            const res = await fetch(`/api/get_ticket/${ticketId}`);
+            const data = await res.json();
+            if(!data.found) return;
+
+            document.getElementById('badge-status').innerText = data.Status;
+            document.getElementById('badge-priority').innerText = data.Priority;
+            document.getElementById('det-category').innerText = data.Category;
+            document.getElementById('det-assignee').innerText = data.Assigned_To;
+            document.getElementById('det-date').innerText = data.Created_Date;
+            document.getElementById('det-by').innerText = data.Created_By || 'Unknown';
+            document.getElementById('det-desc').innerText = data.Description || 'No description provided.';
+
+            if(data.Priority === 'Critical') {
+                document.getElementById('badge-priority').className = 'px-3 py-1 bg-red-600 rounded-full text-[10px] uppercase font-bold text-white';
+            }
+            if(data.SLA_Status === 'breached') {
+                document.getElementById('sla-box').classList.remove('hidden');
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    async function loadComments() {
+        try {
+            const res = await fetch(`/api/tickets/${ticketId}/comments`);
+            const data = await res.json();
+            const list = document.getElementById('comments-list');
+            
+            if (data.length === 0) {
+                list.innerHTML = '<p class="text-zinc-600 text-[10px] uppercase italic text-center py-4">No communication logs found.</p>';
+                return;
+            }
+
+            list.innerHTML = data.map(c => `
+                <div class="comment-item pl-6 py-2">
+                    <div class="flex justify-between mb-2">
+                        <span class="text-xs font-black uppercase text-red-500 italic">${c.author}</span>
+                        <span class="text-[9px] font-mono text-zinc-600 uppercase">${c.time}</span>
+                    </div>
+                    <p class="text-sm text-zinc-400 leading-relaxed">${c.body}</p>
+                </div>
+            `).join('');
+            list.scrollTop = list.scrollHeight;
+        } catch(e) { console.error(e); }
+    }
+
+    async function postComment() {
+        const body = document.getElementById('comment-input').value.trim();
+        if(!body) return;
+        try {
+            const res = await fetch(`/api/tickets/${ticketId}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ body })
+            });
+            if(res.ok) {
+                document.getElementById('comment-input').value = '';
+                loadComments();
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    loadTicket();
+    loadComments();
+</script>
+</body>
+</html>

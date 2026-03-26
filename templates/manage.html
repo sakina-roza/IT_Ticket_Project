@@ -139,6 +139,14 @@
                         class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 transition-colors">
                 </div>
                 <div>
+                    <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Description</label>
+                    <textarea id="add-description" rows="3" placeholder="Ticket details..."
+                        class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-zinc-300 transition-colors resize-none"></textarea>
+                    <div class="mt-2 flex justify-end">
+                        <button onclick="autoClassify('add-description', 'add-category')" class="text-[9px] font-bold text-red-500 hover:text-red-400 uppercase tracking-widest">✨ AUTO-CLASSIFY</button>
+                    </div>
+                </div>
+                <div>
                     <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Resolution Time (hours)</label>
                     <input type="number" id="add-res" placeholder="e.g. 4" min="0"
                         class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 transition-colors">
@@ -368,6 +376,22 @@
     }
 
     // ---- ADD ----
+    async function autoClassify(textId, catId) {
+        const text = document.getElementById(textId).value;
+        if (!text) return;
+        try {
+            const res = await fetch('/api/classify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            const data = await res.json();
+            if (data.category) {
+                document.getElementById(catId).value = data.category;
+            }
+        } catch (e) { console.error(e); }
+    }
+
     async function submitAdd() {
         const payload = {
             Ticket_ID:            document.getElementById('add-tid').value.trim(),
@@ -375,6 +399,7 @@
             Status:               document.getElementById('add-status').value,
             Priority:             document.getElementById('add-priority').value,
             Assigned_To:          document.getElementById('add-agent').value.trim(),
+            Description:          document.getElementById('add-description').value.trim(),
             Resolution_Time_Hours: document.getElementById('add-res').value
         };
 
@@ -386,7 +411,7 @@
         const data = await res.json();
         if (data.success) {
             showToast(`✅ Ticket ${payload.Ticket_ID} created!`, 'success');
-            ['add-tid','add-category','add-agent','add-res'].forEach(id => document.getElementById(id).value = '');
+            ['add-tid','add-category','add-agent','add-res','add-description'].forEach(id => document.getElementById(id).value = '');
             await loadIds();
         } else {
             showToast('❌ ' + (data.error || 'Failed to create ticket.'), 'error');
