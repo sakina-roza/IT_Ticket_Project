@@ -1,107 +1,285 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
         body { background: #050505; color: white; font-family: sans-serif; }
-        .glass { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(220, 38, 38, 0.2); backdrop-filter: blur(10px); }
+        .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); backdrop-filter: blur(10px); }
+        .sla-green  { background: rgba(34,197,94,0.08);  border: 1px solid rgba(34,197,94,0.25); }
+        .sla-yellow { background: rgba(234,179,8,0.08);  border: 1px solid rgba(234,179,8,0.25); }
+        .sla-red    { background: rgba(220,38,38,0.08);  border: 1px solid rgba(220,38,38,0.35); }
+        .toggle-btn { padding:0.3rem 0.9rem; border-radius:0.5rem; font-size:0.65rem; font-weight:700;
+            text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; border:none; transition:all 0.2s; }
+        .toggle-btn.active { background:#dc2626; color:white; }
+        .toggle-btn:not(.active) { background:transparent; color:#52525b; }
+        .toggle-btn:not(.active):hover { color:#aaa; }
     </style>
 </head>
 <body class="p-6">
-    <div class="max-w-7xl mx-auto">
-        <nav class="flex justify-between items-center mb-10 border-b border-white/5 pb-4">
-            <div class="flex gap-6">
-                <a href="/dashboard" class="text-red-600 font-bold border-b-2 border-red-600">DASHBOARD</a>
-                <a href="/manage" class="text-zinc-500 hover:text-white">MANAGE</a>
-            </div>
-            <a href="/logout" class="text-xs bg-zinc-800 px-3 py-1 rounded">LOGOUT</a>
-        </nav>
+<div class="max-w-7xl mx-auto">
 
-        <div class="flex justify-between items-end mb-8">
+    {% set active = 'dashboard' %}
+    {% include 'nav.html' %}
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-end mb-6">
+        <div>
+            <h1 class="text-4xl font-black italic">PERFORMANCE <span class="text-red-600">2026</span></h1>
+            <p id="sync-clock" class="text-[10px] font-mono text-zinc-500 mt-2 tracking-widest uppercase">Initializing...</p>
+        </div>
+        <button onclick="refreshData()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-all">↺ Refresh</button>
+    </div>
+
+    <!-- KPI CARDS -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div class="glass p-6 rounded-3xl text-center">
+            <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Total Tickets</p>
+            <h2 id="kpi-total" class="text-4xl font-bold mt-2">--</h2>
+        </div>
+        <div class="glass p-6 rounded-3xl text-center border-b-4 border-red-600">
+            <p class="text-[10px] text-red-500 uppercase tracking-widest">Open Issues</p>
+            <h2 id="kpi-open" class="text-4xl font-bold mt-2">--</h2>
+        </div>
+        <div class="glass p-6 rounded-3xl text-center">
+            <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Critical P1</p>
+            <h2 id="kpi-critical" class="text-4xl font-bold mt-2 text-red-500">--</h2>
+        </div>
+        <div class="glass p-6 rounded-3xl text-center">
+            <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Avg Resolution</p>
+            <h2 id="kpi-avg" class="text-4xl font-bold mt-2">--</h2>
+        </div>
+    </div>
+
+    <!-- SLA INDICATORS -->
+    <div class="grid grid-cols-3 gap-4 mb-4">
+        <div class="sla-green p-5 rounded-2xl text-center cursor-pointer hover:opacity-80 transition-opacity" onclick="window.location.href='/tickets'">
+            <p class="text-[10px] text-green-400 uppercase font-bold tracking-widest">🟢 On Track</p>
+            <h2 id="sla-on" class="text-3xl font-bold mt-1 text-green-400">--</h2>
+            <p class="text-[9px] text-green-700 mt-1">Within SLA</p>
+        </div>
+        <div class="sla-yellow p-5 rounded-2xl text-center cursor-pointer hover:opacity-80 transition-opacity" onclick="window.location.href='/tickets'">
+            <p class="text-[10px] text-yellow-400 uppercase font-bold tracking-widest">🟡 Near Breach</p>
+            <h2 id="sla-near" class="text-3xl font-bold mt-1 text-yellow-400">--</h2>
+            <p class="text-[9px] text-yellow-700 mt-1">Action Needed</p>
+        </div>
+        <div class="sla-red p-5 rounded-2xl text-center cursor-pointer hover:opacity-80 transition-opacity" onclick="window.location.href='/tickets'">
+            <p class="text-[10px] text-red-400 uppercase font-bold tracking-widest">🔴 Breached</p>
+            <h2 id="sla-breach" class="text-3xl font-bold mt-1 text-red-400">--</h2>
+            <p class="text-[9px] text-red-700 mt-1">SLA Violated</p>
+        </div>
+    </div>
+
+    <!-- MINI INSIGHTS -->
+    <div class="grid grid-cols-3 gap-4 mb-8">
+        <div class="glass p-4 rounded-2xl flex items-center gap-4">
+            <span class="text-3xl">📊</span>
             <div>
-                <h1 class="text-4xl font-black italic">PERFORMANCE <span class="text-red-600">2026</span></h1>
-                <p id="sync-clock" class="text-[10px] font-mono text-zinc-500 mt-2 tracking-widest uppercase">Initializing...</p>
-            </div>
-            <button onclick="refreshData()" class="bg-red-600 px-6 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-all">Refresh Data</button>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="glass p-6 rounded-3xl text-center">
-                <p class="text-[10px] text-zinc-500 uppercase">Total Tickets</p>
-                <h2 id="kpi-total" class="text-4xl font-bold mt-2">--</h2>
-            </div>
-            <div class="glass p-6 rounded-3xl text-center border-b-4 border-red-600">
-                <p class="text-[10px] text-red-500 uppercase">Open Issues</p>
-                <h2 id="kpi-open" class="text-4xl font-bold mt-2">--</h2>
-            </div>
-            <div class="glass p-6 rounded-3xl text-center">
-                <p class="text-[10px] text-zinc-500 uppercase">Critical P1</p>
-                <h2 id="kpi-critical" class="text-4xl font-bold mt-2 text-red-500">--</h2>
-            </div>
-            <div class="glass p-6 rounded-3xl text-center">
-                <p class="text-[10px] text-zinc-500 uppercase">Avg Resolution</p>
-                <h2 id="kpi-avg" class="text-4xl font-bold mt-2">--</h2>
+                <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Tickets Today</p>
+                <p id="ins-today" class="text-2xl font-bold">--</p>
             </div>
         </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 glass p-8 rounded-[2rem]">
-                <canvas id="trendChart" height="120"></canvas>
+        <div class="glass p-4 rounded-2xl flex items-center gap-4">
+            <span class="text-3xl">⚠️</span>
+            <div>
+                <p class="text-[10px] text-zinc-500 uppercase tracking-widest">SLA Breaches</p>
+                <p id="ins-breach" class="text-2xl font-bold text-red-400">--</p>
             </div>
-            <div class="glass p-8 rounded-[2rem]">
-                <h3 class="text-xs font-bold text-zinc-500 uppercase mb-4">Activity Log</h3>
-                <div id="activity-log" class="space-y-4"></div>
+        </div>
+        <div class="glass p-4 rounded-2xl flex items-center gap-4">
+            <span class="text-3xl">🔥</span>
+            <div>
+                <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Avg Resolution</p>
+                <p id="ins-avg" class="text-2xl font-bold">--</p>
             </div>
         </div>
     </div>
 
-    <script>
-        let myChart;
+    <!-- CHARTS GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
 
-        async function refreshData() {
-            try {
-                console.log("Fetching stats...");
-                const res = await fetch('/api/stats');
-                const data = await res.json();
-                console.log("Data loaded:", data);
+        <!-- Trend Chart (spans 2 cols) -->
+        <div class="lg:col-span-2 glass p-6 rounded-[2rem]">
+            <div class="flex justify-between items-center mb-4">
+                <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest">Ticket Trend</p>
+                <div class="flex gap-1 bg-zinc-900 p-1 rounded-lg">
+                    <button class="toggle-btn active" id="btn-weekly"  onclick="switchPeriod('weekly')">Weekly</button>
+                    <button class="toggle-btn"        id="btn-monthly" onclick="switchPeriod('monthly')">Monthly</button>
+                </div>
+            </div>
+            <canvas id="trendChart" height="160"></canvas>
+        </div>
 
-                // UI Updates
-                document.getElementById('kpi-total').innerText = data.stats.total;
-                document.getElementById('kpi-open').innerText = data.stats.open;
-                document.getElementById('kpi-critical').innerText = data.stats.critical;
-                document.getElementById('kpi-avg').innerText = data.stats.avg_res + "h";
-                document.getElementById('sync-clock').innerText = "LIVE @ " + data.sync_time;
+        <!-- By Priority -->
+        <div class="glass p-6 rounded-[2rem]">
+            <div class="flex justify-between items-center mb-4">
+                <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest">By Priority</p>
+                <p class="text-[9px] text-zinc-700">click → filter</p>
+            </div>
+            <canvas id="priorityChart" height="160"></canvas>
+        </div>
 
-                // Log Update
-                const log = document.getElementById('activity-log');
-                log.innerHTML = data.recent.length > 0 ? data.recent.map(t => `
-                    <div class="flex justify-between border-b border-white/5 pb-2">
-                        <span class="text-xs font-mono font-bold">${t.Ticket_ID}</span>
-                        <span class="text-[10px] text-zinc-500">${t.Status}</span>
-                    </div>
-                `).join('') : '<p class="text-zinc-600 text-xs text-center">No recent activity</p>';
+        <!-- By Status -->
+        <div class="glass p-6 rounded-[2rem]">
+            <div class="flex justify-between items-center mb-4">
+                <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest">By Status</p>
+                <p class="text-[9px] text-zinc-700">click → filter</p>
+            </div>
+            <canvas id="statusChart" height="160"></canvas>
+        </div>
+    </div>
 
-                // Chart Update
-                const ctx = document.getElementById('trendChart').getContext('2d');
-                if(myChart) myChart.destroy();
-                myChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: data.trend.labels,
-                        datasets: [{ data: data.trend.values, borderColor: '#dc2626', tension: 0.4, fill: true, backgroundColor: 'rgba(220,38,38,0.1)' }]
-                    },
-                    options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#111' } } } }
-                });
+    <!-- Activity Log -->
+    <div class="glass p-6 rounded-[2rem]">
+        <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Recent Activity</h3>
+        <div id="activity-log" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+    </div>
 
-            } catch (err) {
-                console.error("Critical Error:", err);
-                document.getElementById('sync-clock').innerText = "CONNECTION FAILED";
+</div>
+
+<script>
+    let trendChart, priorityChart, statusChart;
+    let priorityLabels = [], statusLabels = [];
+    let currentPeriod = 'weekly';
+
+    async function loadNotifications() {
+        try {
+            const res  = await fetch('/api/notifications');
+            const data = await res.json();
+            const badge = document.getElementById('notif-badge');
+            const list  = document.getElementById('notif-list');
+            if (!badge || !list) return;
+            if (data.length > 0) {
+                badge.textContent = data.length;
+                badge.classList.remove('hidden');
+                list.innerHTML = data.map(n => `
+                    <div class="flex items-start gap-2 border-b border-white/5 pb-2">
+                        <span class="${n.priority==='Critical'?'text-red-400':n.priority==='High'?'text-orange-400':'text-zinc-400'} text-xs mt-0.5">●</span>
+                        <div>
+                            <p class="text-xs font-mono font-bold">${n.id}</p>
+                            <p class="text-[10px] text-zinc-500">${n.message}</p>
+                        </div>
+                    </div>`).join('');
+            } else {
+                badge.classList.add('hidden');
+                list.innerHTML = '<p class="text-xs text-zinc-600 text-center py-4">No recent activity</p>';
             }
-        }
+        } catch(e) {}
+    }
 
+    // ── Period toggle ─────────────────────────────────────────────────────────
+    function switchPeriod(p) {
+        currentPeriod = p;
+        document.getElementById('btn-weekly').classList.toggle('active',  p === 'weekly');
+        document.getElementById('btn-monthly').classList.toggle('active', p === 'monthly');
         refreshData();
-        setInterval(refreshData, 15000);
-    </script>
+    }
+
+    // ── Main data refresh ─────────────────────────────────────────────────────
+    async function refreshData() {
+        try {
+            const res  = await fetch(`/api/stats?period=${currentPeriod}`);
+            const data = await res.json();
+
+            document.getElementById('kpi-total').innerText    = data.stats.total;
+            document.getElementById('kpi-open').innerText     = data.stats.open;
+            document.getElementById('kpi-critical').innerText = data.stats.critical;
+            document.getElementById('kpi-avg').innerText      = data.stats.avg_res + "h";
+            document.getElementById('sync-clock').innerText   = "LIVE @ " + data.sync_time;
+
+            if (data.sla) {
+                document.getElementById('sla-on').innerText     = data.sla.on_track;
+                document.getElementById('sla-near').innerText   = data.sla.near_breach;
+                document.getElementById('sla-breach').innerText = data.sla.breached;
+            }
+            if (data.insights) {
+                document.getElementById('ins-today').innerText  = data.insights.tickets_today;
+                document.getElementById('ins-breach').innerText = data.insights.sla_breaches;
+                document.getElementById('ins-avg').innerText    = data.insights.avg_res + "h";
+            }
+
+            // Activity log
+            const SLA_COLOR = { on_track:'text-green-400', near_breach:'text-yellow-400', breached:'text-red-400', unknown:'text-zinc-600' };
+            const SLA_ICON  = { on_track:'🟢', near_breach:'🟡', breached:'🔴', unknown:'⚪' };
+            const log = document.getElementById('activity-log');
+            log.innerHTML = (data.recent||[]).length > 0 ? data.recent.map(t => `
+                <div class="glass p-3 rounded-xl flex justify-between items-center">
+                    <span class="text-xs font-mono font-bold">${t.Ticket_ID}</span>
+                    <div class="flex gap-2 items-center">
+                        <span class="text-[10px] text-zinc-500">${t.Status}</span>
+                        <span class="text-[10px] ${SLA_COLOR[t.SLA_Status]||'text-zinc-600'}">${SLA_ICON[t.SLA_Status]||'⚪'}</span>
+                    </div>
+                </div>`).join('') : '<p class="text-zinc-600 text-xs col-span-4 text-center">No recent activity</p>';
+
+            // ── Trend Chart ──
+            const ctx1 = document.getElementById('trendChart').getContext('2d');
+            if (trendChart) trendChart.destroy();
+            trendChart = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: data.trend.labels,
+                    datasets: [{ data: data.trend.values, backgroundColor: 'rgba(220,38,38,0.7)', borderColor: '#dc2626', borderRadius: 6 }]
+                },
+                options: {
+                    onClick: (e, els) => {
+                        if (els.length > 0) {
+                            const label = data.trend.labels[els[0].index];
+                            window.location.href = `/tickets?date_from=${label}&date_to=${label}`;
+                        }
+                    },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid:{display:false}, ticks:{color:'#555',font:{size:9}} },
+                        y: { grid:{color:'#111'},  ticks:{color:'#555',font:{size:9}} }
+                    }
+                }
+            });
+
+            // ── Priority Chart ──
+            priorityLabels = Object.keys(data.priority_counts||{});
+            const pValues  = Object.values(data.priority_counts||{});
+            const ctx2 = document.getElementById('priorityChart').getContext('2d');
+            if (priorityChart) priorityChart.destroy();
+            priorityChart = new Chart(ctx2, {
+                type: 'doughnut',
+                data: { labels: priorityLabels, datasets: [{ data: pValues, backgroundColor: ['#dc2626','#f97316','#eab308','#3f3f46'], borderWidth: 0 }] },
+                options: {
+                    onClick: (e, els) => {
+                        if (els.length > 0) window.location.href = `/tickets?priority=${priorityLabels[els[0].index]}`;
+                    },
+                    plugins: { legend: { labels: { color:'#888', font:{size:9}, padding:8 } } },
+                    cutout: '60%'
+                }
+            });
+
+            // ── Status Chart ──
+            statusLabels = Object.keys(data.status_counts||{});
+            const sValues = Object.values(data.status_counts||{});
+            const STATUS_COLORS = ['#dc2626','#eab308','#22c55e','#52525b','#3b82f6'];
+            const ctx3 = document.getElementById('statusChart').getContext('2d');
+            if (statusChart) statusChart.destroy();
+            statusChart = new Chart(ctx3, {
+                type: 'doughnut',
+                data: { labels: statusLabels, datasets: [{ data: sValues, backgroundColor: STATUS_COLORS, borderWidth: 0 }] },
+                options: {
+                    onClick: (e, els) => {
+                        if (els.length > 0) window.location.href = `/tickets?status=${statusLabels[els[0].index]}`;
+                    },
+                    plugins: { legend: { labels: { color:'#888', font:{size:9}, padding:8 } } },
+                    cutout: '60%'
+                }
+            });
+
+        } catch(err) {
+            document.getElementById('sync-clock').innerText = "CONNECTION FAILED";
+        }
+    }
+
+    refreshData();
+    loadNotifications();
+    setInterval(refreshData, 15000);
+    setInterval(loadNotifications, 30000);
+</script>
 </body>
 </html>

@@ -1,0 +1,40 @@
+<nav class="flex justify-between items-center mb-10 border-b border-white/5 pb-4">
+    <div class="flex gap-6">
+        {% if is_admin_user %}
+            <a href="/dashboard" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'dashboard' else 'text-zinc-500 hover:text-white transition-colors' }}">DASHBOARD</a>
+            <a href="/tickets"   class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'tickets'   else 'text-zinc-500 hover:text-white transition-colors' }}">TICKETS</a>
+            <a href="/manage"    class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'manage'    else 'text-zinc-500 hover:text-white transition-colors' }}">MANAGE</a>
+        {% else %}
+            <a href="/my_tickets"    class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'my_tickets'    else 'text-zinc-500 hover:text-white transition-colors' }}">MY TICKETS</a>
+            <a href="/create_ticket" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'create_ticket' else 'text-zinc-500 hover:text-white transition-colors' }}">CREATE TICKET</a>
+        {% endif %}
+    </div>
+    <div class="flex items-center gap-4">
+        {% if is_admin_user %}
+        <div class="relative">
+            <button onclick="toggleNotif()" class="text-zinc-400 hover:text-white text-xl relative">
+                🔔
+                <span id="notif-badge" class="hidden absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">0</span>
+            </button>
+            <div id="notif-dropdown" style="display:none;position:absolute;right:0;top:2rem;width:18rem;background:#111;border:1px solid #333;border-radius:1rem;z-index:50;padding:1rem;">
+                <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Recent Activity</p>
+                <div id="notif-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
+            </div>
+        </div>
+        {% endif %}
+        <span class="text-xs text-zinc-600 font-mono">{{ current_user.name if current_user else '' }}</span>
+        <a href="/logout" class="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1 rounded transition-colors">LOGOUT</a>
+    </div>
+</nav>
+<script>
+    function toggleNotif() {
+        const dd = document.getElementById('notif-dropdown');
+        if (dd) dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+    }
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#notif-dropdown') && !e.target.closest('button[onclick="toggleNotif()"]')) {
+            const dd = document.getElementById('notif-dropdown');
+            if (dd) dd.style.display = 'none';
+        }
+    });
+</script>

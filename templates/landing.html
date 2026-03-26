@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Command Center</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            color: white;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* ── Particle Canvas ── */
+        #canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+        }
+
+        /* ── Scanlines overlay ── */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 2px,
+                rgba(0,0,0,0.08) 2px,
+                rgba(0,0,0,0.08) 4px
+            );
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* ── Red grid ── */
+        .grid-bg {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-image:
+                linear-gradient(rgba(220,38,38,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(220,38,38,0.04) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: 0;
+            animation: gridPulse 4s ease-in-out infinite;
+        }
+        @keyframes gridPulse {
+            0%, 100% { opacity: 0.5; }
+            50%       { opacity: 1; }
+        }
+
+        /* ── Main container ── */
+        .center {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            gap: 0;
+        }
+
+        /* ── Boot lines ── */
+        #boot-lines {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 20;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 3rem;
+            transition: opacity 0.8s ease;
+        }
+        .boot-line {
+            font-size: 0.72rem;
+            color: #dc2626;
+            opacity: 0;
+            margin-bottom: 4px;
+            animation: bootFade 0.15s ease forwards;
+            letter-spacing: 0.05em;
+        }
+        .boot-line.green { color: #22c55e; }
+        .boot-line.dim   { color: #3f3f46; }
+        @keyframes bootFade {
+            to { opacity: 1; }
+        }
+
+        /* ── Logo / Title ── */
+        .logo-wrap {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 1s ease, transform 1s ease;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .logo-wrap.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 0.6rem;
+            letter-spacing: 0.3em;
+            color: #dc2626;
+            border: 1px solid rgba(220,38,38,0.4);
+            padding: 0.3rem 1rem;
+            border-radius: 999px;
+            margin-bottom: 1.5rem;
+            animation: badgePulse 2s ease-in-out infinite;
+        }
+        @keyframes badgePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+            50%       { box-shadow: 0 0 16px 2px rgba(220,38,38,0.3); }
+        }
+
+        .main-title {
+            font-size: clamp(3rem, 8vw, 7rem);
+            font-weight: 900;
+            font-style: italic;
+            line-height: 1;
+            letter-spacing: -0.02em;
+            position: relative;
+        }
+        .main-title .red { color: #dc2626; }
+
+        /* Glitch */
+        .glitch {
+            position: relative;
+            display: inline-block;
+        }
+        .glitch::before,
+        .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+        }
+        .glitch::before {
+            color: #dc2626;
+            clip-path: polygon(0 30%, 100% 30%, 100% 50%, 0 50%);
+            animation: glitch1 3.5s infinite;
+        }
+        .glitch::after {
+            color: #60a5fa;
+            clip-path: polygon(0 60%, 100% 60%, 100% 75%, 0 75%);
+            animation: glitch2 3.5s infinite;
+        }
+        @keyframes glitch1 {
+            0%, 90%, 100% { transform: none; opacity: 0; }
+            92%            { transform: translate(-4px, 2px); opacity: 0.7; }
+            94%            { transform: translate(4px, -2px); opacity: 0.5; }
+            96%            { transform: translate(-2px, 1px); opacity: 0.6; }
+            98%            { transform: none; opacity: 0; }
+        }
+        @keyframes glitch2 {
+            0%, 88%, 100% { transform: none; opacity: 0; }
+            90%            { transform: translate(4px, -2px); opacity: 0.6; }
+            93%            { transform: translate(-4px, 2px); opacity: 0.5; }
+            96%            { transform: translate(2px, -1px); opacity: 0.4; }
+            98%            { transform: none; opacity: 0; }
+        }
+
+        .sub-title {
+            font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+            color: #52525b;
+            letter-spacing: 0.4em;
+            text-transform: uppercase;
+            margin-top: 0.75rem;
+        }
+
+        /* ── Stats row ── */
+        .stats-row {
+            display: flex;
+            gap: 3rem;
+            margin-top: 2.5rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.8s ease 0.3s, transform 0.8s ease 0.3s;
+        }
+        .stats-row.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .stat-item { text-align: center; }
+        .stat-num {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #dc2626;
+            display: block;
+            font-style: italic;
+        }
+        .stat-lbl {
+            font-size: 0.55rem;
+            color: #3f3f46;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        /* ── Divider ── */
+        .divider {
+            width: 200px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #dc2626, transparent);
+            margin: 2rem auto;
+            opacity: 0;
+            transition: opacity 0.8s ease 0.5s;
+        }
+        .divider.visible { opacity: 1; }
+
+        /* ── Enter button ── */
+        .enter-btn {
+            opacity: 0;
+            transform: translateY(16px);
+            transition: opacity 0.8s ease 0.6s, transform 0.8s ease 0.6s;
+        }
+        .enter-btn.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .enter-btn a {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: #dc2626;
+            color: white;
+            text-decoration: none;
+            font-weight: 900;
+            font-size: 0.8rem;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            padding: 1rem 2.5rem;
+            border-radius: 999px;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.2s;
+        }
+        .enter-btn a::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+        }
+        .enter-btn a:hover { background: #b91c1c; }
+        .enter-btn a .arrow {
+            display: inline-block;
+            transition: transform 0.3s;
+        }
+        .enter-btn a:hover .arrow { transform: translateX(6px); }
+
+        /* Ripple on click */
+        .enter-btn a:active::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 999px;
+            animation: ripple 0.4s ease;
+        }
+        @keyframes ripple {
+            from { transform: scale(0.8); opacity: 1; }
+            to   { transform: scale(1.2); opacity: 0; }
+        }
+
+        /* ── Corner decorations ── */
+        .corner {
+            position: fixed;
+            width: 60px; height: 60px;
+            z-index: 5;
+            opacity: 0.4;
+        }
+        .corner.tl { top: 24px; left: 24px; border-top: 2px solid #dc2626; border-left: 2px solid #dc2626; }
+        .corner.tr { top: 24px; right: 24px; border-top: 2px solid #dc2626; border-right: 2px solid #dc2626; }
+        .corner.bl { bottom: 24px; left: 24px; border-bottom: 2px solid #dc2626; border-left: 2px solid #dc2626; }
+        .corner.br { bottom: 24px; right: 24px; border-bottom: 2px solid #dc2626; border-right: 2px solid #dc2626; }
+
+        /* ── Bottom status bar ── */
+        .status-bar {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.6rem;
+            color: #27272a;
+            letter-spacing: 0.2em;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 1s ease 1.2s;
+        }
+        .status-bar.visible { opacity: 1; }
+        .status-bar .dot {
+            display: inline-block;
+            width: 6px; height: 6px;
+            background: #22c55e;
+            border-radius: 50%;
+            margin-right: 6px;
+            animation: blink 1.5s ease-in-out infinite;
+            vertical-align: middle;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.2; }
+        }
+
+        /* ── Page transition out ── */
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: #dc2626;
+            z-index: 9999;
+            transform: scaleX(0);
+            transform-origin: left;
+        }
+        #overlay.go {
+            animation: slideIn 0.5s cubic-bezier(0.7,0,0.3,1) forwards;
+        }
+        @keyframes slideIn {
+            from { transform: scaleX(0); }
+            to   { transform: scaleX(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Transition overlay -->
+    <div id="overlay"></div>
+
+    <!-- Boot sequence -->
+    <div id="boot-lines"></div>
+
+    <!-- Background layers -->
+    <canvas id="canvas"></canvas>
+    <div class="grid-bg"></div>
+    <div class="scanlines"></div>
+
+    <!-- Corner brackets -->
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+
+    <!-- Main content -->
+    <div class="center">
+        <div class="logo-wrap" id="logo">
+            <div class="badge">● SYSTEM ONLINE — 2026</div>
+            <h1 class="main-title">
+                <span class="glitch" data-text="IT">IT</span>
+                <span class="red"> COMMAND</span><br>
+                <span style="color:#18181b;">COMMAND </span><span class="glitch" data-text="CENTER">CENTER</span>
+            </h1>
+            <p class="sub-title">Intelligent Ticket Management Platform</p>
+        </div>
+
+        <div class="stats-row" id="stats">
+            <div class="stat-item">
+                <span class="stat-num" id="s1">0</span>
+                <span class="stat-lbl">Tickets Tracked</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-num" id="s2">0%</span>
+                <span class="stat-lbl">SLA Compliance</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-num" id="s3">0h</span>
+                <span class="stat-lbl">Avg Resolution</span>
+            </div>
+        </div>
+
+        <div class="divider" id="divider"></div>
+
+        <div class="enter-btn" id="enter-btn">
+            <a href="/login" onclick="goLogin(event)">
+                ENTER SYSTEM <span class="arrow">→</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="status-bar" id="status-bar">
+        <span class="dot"></span>
+        ALL SYSTEMS OPERATIONAL &nbsp;·&nbsp; SECURE CONNECTION ESTABLISHED
+    </div>
+
+<script>
+    // ── Particle canvas ──
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const particles = [];
+    const COUNT = 80;
+
+    for (let i = 0; i < COUNT; i++) {
+        particles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            r: Math.random() * 1.5 + 0.3,
+            dx: (Math.random() - 0.5) * 0.4,
+            dy: (Math.random() - 0.5) * 0.4,
+            alpha: Math.random() * 0.5 + 0.1
+        });
+    }
+
+    function drawParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+            // Draw particle
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(220,38,38,${p.alpha})`;
+            ctx.fill();
+
+            // Draw connections
+            particles.forEach(q => {
+                const dist = Math.hypot(p.x - q.x, p.y - q.y);
+                if (dist < 120) {
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(q.x, q.y);
+                    ctx.strokeStyle = `rgba(220,38,38,${0.06 * (1 - dist/120)})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                }
+            });
+
+            // Move
+            p.x += p.dx;
+            p.y += p.dy;
+            if (p.x < 0 || p.x > canvas.width)  p.dx *= -1;
+            if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
+        });
+        requestAnimationFrame(drawParticles);
+    }
+    drawParticles();
+
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    });
+
+    // ── Boot sequence ──
+    const bootLines = [
+        { text: 'BIOS v4.2.1 — IT Command Systems Corp.', cls: 'dim' },
+        { text: 'Initializing hardware abstraction layer...', cls: 'dim' },
+        { text: 'Loading kernel modules.............. OK', cls: 'green' },
+        { text: 'Mounting encrypted data volume........ OK', cls: 'green' },
+        { text: 'Starting Flask application server....', cls: '' },
+        { text: 'Connecting to Excel data source...... OK', cls: 'green' },
+        { text: 'Loading ticket database.............. OK', cls: 'green' },
+        { text: 'Running SLA engine................... OK', cls: 'green' },
+        { text: 'Starting notification service........ OK', cls: 'green' },
+        { text: '──────────────────────────────────────────', cls: 'dim' },
+        { text: '✓ ALL SYSTEMS NOMINAL — READY', cls: 'green' },
+    ];
+
+    const bootEl = document.getElementById('boot-lines');
+    let lineIndex = 0;
+
+    function showNextLine() {
+        if (lineIndex >= bootLines.length) {
+            // Fade out boot screen
+            setTimeout(() => {
+                bootEl.style.opacity = '0';
+                setTimeout(() => {
+                    bootEl.style.display = 'none';
+                    revealContent();
+                }, 800);
+            }, 400);
+            return;
+        }
+        const l = bootLines[lineIndex];
+        const div = document.createElement('div');
+        div.className = `boot-line ${l.cls}`;
+        div.textContent = '> ' + l.text;
+        div.style.animationDelay = '0s';
+        bootEl.appendChild(div);
+        lineIndex++;
+        setTimeout(showNextLine, lineIndex < 5 ? 120 : lineIndex < 9 ? 180 : 300);
+    }
+
+    setTimeout(showNextLine, 400);
+
+    // ── Reveal main content ──
+    function revealContent() {
+        setTimeout(() => document.getElementById('logo').classList.add('visible'), 100);
+        setTimeout(() => document.getElementById('stats').classList.add('visible'), 300);
+        setTimeout(() => document.getElementById('divider').classList.add('visible'), 500);
+        setTimeout(() => document.getElementById('enter-btn').classList.add('visible'), 600);
+        setTimeout(() => document.getElementById('status-bar').classList.add('visible'), 800);
+
+        // Animate counters (fetched from API)
+        fetch('/api/stats')
+            .then(r => r.json())
+            .then(data => {
+                animateCount('s1', 0, data.stats.total, '', 1200);
+                animateCount('s2', 0, 94, '%', 1400);
+                animateCount('s3', 0, Math.round(data.stats.avg_res), 'h', 1600);
+            })
+            .catch(() => {
+                animateCount('s1', 0, 500, '', 1200);
+                animateCount('s2', 0, 94, '%', 1400);
+                animateCount('s3', 0, 6, 'h', 1600);
+            });
+    }
+
+    function animateCount(id, from, to, suffix, delay) {
+        setTimeout(() => {
+            const el = document.getElementById(id);
+            const duration = 1200;
+            const start = performance.now();
+            function step(now) {
+                const p = Math.min((now - start) / duration, 1);
+                const ease = 1 - Math.pow(1 - p, 3);
+                el.textContent = Math.round(from + (to - from) * ease) + suffix;
+                if (p < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }, delay);
+    }
+
+    // ── Page transition ──
+    function goLogin(e) {
+        e.preventDefault();
+        const ov = document.getElementById('overlay');
+        ov.classList.add('go');
+        setTimeout(() => window.location.href = '/login', 480);
+    }
+</script>
+</body>
+</html>

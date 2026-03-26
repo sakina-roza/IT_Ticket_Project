@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #050505; color: white; font-family: sans-serif; }
+        .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); }
+        select option { background: #111; }
+        .toast { position:fixed; bottom:1.5rem; right:1.5rem; padding:0.75rem 1.25rem; border-radius:0.75rem;
+            font-size:0.75rem; font-weight:700; z-index:100; transform:translateY(4rem); opacity:0; transition:all 0.3s ease; }
+        .toast.show { transform:translateY(0); opacity:1; }
+        .toast.success { background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.4); color:#4ade80; }
+        .toast.error   { background:rgba(220,38,38,0.15); border:1px solid rgba(220,38,38,0.4); color:#f87171; }
+    </style>
+</head>
+<body class="p-6">
+<div class="max-w-2xl mx-auto">
+
+    {% set active = 'create_ticket' %}
+    {% include 'nav.html' %}
+
+    <div class="mb-8">
+        <h1 class="text-3xl font-black italic">SUBMIT <span class="text-red-600">TICKET</span></h1>
+        <p class="text-xs text-zinc-500 mt-1">Describe your issue and our IT team will assign it.</p>
+    </div>
+
+    <div id="ticket-form" class="glass p-8 rounded-3xl space-y-5">
+        <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Category <span class="text-red-500">*</span></label>
+            <select id="ct-category" class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-zinc-300 transition-colors">
+                <option value="">Select a category...</option>
+                <option value="Network">Network</option>
+                <option value="Hardware">Hardware</option>
+                <option value="Software">Software</option>
+                <option value="Security">Security</option>
+                <option value="Access">Access / Permissions</option>
+                <option value="Email">Email</option>
+                <option value="Printer">Printer</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Priority</label>
+            <div class="grid grid-cols-4 gap-2">
+                <button type="button" onclick="setPriority('Low',this)"
+                    class="pri-btn border border-zinc-700 p-3 rounded-xl text-xs font-bold text-zinc-400 hover:border-zinc-500 transition-all">LOW</button>
+                <button type="button" onclick="setPriority('Medium',this)"
+                    class="pri-btn border border-zinc-700 p-3 rounded-xl text-xs font-bold text-zinc-400 hover:border-zinc-500 transition-all">MEDIUM</button>
+                <button type="button" onclick="setPriority('High',this)"
+                    class="pri-btn border border-zinc-700 p-3 rounded-xl text-xs font-bold text-zinc-400 hover:border-zinc-500 transition-all">HIGH</button>
+                <button type="button" onclick="setPriority('Critical',this)"
+                    class="pri-btn border border-red-900 p-3 rounded-xl text-xs font-bold text-red-700 hover:border-red-600 transition-all">CRITICAL</button>
+            </div>
+        </div>
+
+        <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Description</label>
+            <textarea id="ct-desc" rows="4" placeholder="Describe your issue in detail..."
+                class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-zinc-300 transition-colors resize-none"></textarea>
+        </div>
+
+        <button onclick="submitTicket()"
+            class="w-full bg-red-600 hover:bg-red-700 py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition-all">
+            Submit Ticket
+        </button>
+    </div>
+
+    <!-- Success panel (hidden initially) -->
+    <div id="success-panel" class="hidden glass p-8 rounded-3xl text-center mt-6 border-green-500/20" style="border-color:rgba(34,197,94,0.2);">
+        <p class="text-4xl mb-4">✅</p>
+        <h2 class="text-xl font-black text-green-400">Ticket Submitted!</h2>
+        <p id="success-tid" class="text-sm text-zinc-500 mt-2 font-mono"></p>
+        <p class="text-xs text-zinc-600 mt-1">Our IT team will review and assign your ticket shortly.</p>
+        <div class="flex gap-4 justify-center mt-6">
+            <a href="/my_tickets" class="bg-zinc-800 hover:bg-zinc-700 px-6 py-2 rounded-xl text-xs font-bold uppercase transition-all">View My Tickets</a>
+            <button onclick="resetForm()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-xs font-bold uppercase transition-all">Submit Another</button>
+        </div>
+    </div>
+
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+    let selectedPriority = 'Low';
+
+    // default select Low
+    document.addEventListener('DOMContentLoaded', () => {
+        setPriority('Low', document.querySelectorAll('.pri-btn')[0]);
+    });
+
+    function setPriority(val, btn) {
+        selectedPriority = val;
+        document.querySelectorAll('.pri-btn').forEach(b => {
+            b.classList.remove('bg-red-600','border-red-500','text-white','bg-yellow-600/20','border-yellow-500','text-yellow-300','bg-orange-600/20','border-orange-500','text-orange-300','bg-zinc-700','border-zinc-500','text-white');
+        });
+        const colorMap = {
+            Low:      'bg-zinc-700 border-zinc-500 text-white',
+            Medium:   'bg-yellow-600/20 border-yellow-500 text-yellow-300',
+            High:     'bg-orange-600/20 border-orange-500 text-orange-300',
+            Critical: 'bg-red-600 border-red-500 text-white'
+        };
+        btn.className = `pri-btn border p-3 rounded-xl text-xs font-bold transition-all ${colorMap[val]}`;
+    }
+
+    function showToast(msg, type='success') {
+        const t = document.getElementById('toast');
+        t.textContent = msg; t.className = `toast ${type} show`;
+        setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    async function submitTicket() {
+        const category = document.getElementById('ct-category').value;
+        const desc     = document.getElementById('ct-desc').value.trim();
+        if (!category) { showToast('Please select a category.', 'error'); return; }
+
+        const res = await fetch('/api/submit_ticket', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ Category: category, Priority: selectedPriority, Description: desc })
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('success-panel').classList.remove('hidden');
+            document.getElementById('success-tid').textContent = `Ticket ID: ${data.ticket_id}`;
+            document.getElementById('ticket-form').style.display = 'none';
+        } else {
+            showToast('❌ ' + (data.error || 'Failed to submit ticket.'), 'error');
+        }
+    }
+
+    function resetForm() {
+        document.getElementById('success-panel').classList.add('hidden');
+        document.getElementById('ticket-form').style.display = '';
+        document.getElementById('ct-category').value = '';
+        document.getElementById('ct-desc').value = '';
+        setPriority('Low', document.querySelectorAll('.pri-btn')[0]);
+    }
+</script>
+</body>
+</html>

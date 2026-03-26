@@ -1,0 +1,15 @@
+# User credentials (contains hashed passwords)
+users.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
