@@ -6,6 +6,17 @@
     <style>
         body { background: #050505; color: white; font-family: sans-serif; }
         .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); backdrop-filter: blur(10px); }
+        .toast { position:fixed; bottom:1.5rem; right:1.5rem; padding:0.75rem 1.25rem; border-radius:0.75rem;
+            font-size:0.75rem; font-weight:700; z-index:100; transform:translateY(4rem); opacity:0; transition:all 0.3s ease; }
+        .toast.show { transform:translateY(0); opacity:1; }
+        .toast.success { background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.4); color:#4ade80; }
+        .toast.error   { background:rgba(220,38,38,0.15); border:1px solid rgba(220,38,38,0.4); color:#f87171; }
+        body.light-mode { background: #f4f4f5; color: #18181b; }
+        body.light-mode .glass { background: rgba(0,0,0,0.04); border-color: rgba(220,38,38,0.3); }
+        body.light-mode input, body.light-mode textarea { background: #e4e4e7; color: #18181b; border-color: #a1a1aa; }
+        /* Modal */
+        .modal-bg { position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:200;display:none;align-items:center;justify-content:center; }
+        .modal-bg.open { display:flex; }
     </style>
 </head>
 <body class="p-6">
@@ -14,10 +25,12 @@
 
     <div class="mb-12 text-center">
         <div class="w-32 h-32 bg-red-600 rounded-full mx-auto mb-6 flex items-center justify-center text-5xl font-black text-white shadow-2xl shadow-red-600/20 uppercase">
-            {{ current_user.name[0] if current_user.name else '?' }}
+            {{ current_user.name[0] if current_user and current_user.name else '?' }}
         </div>
-        <h1 class="text-4xl font-black italic uppercase italic">{{ current_user.name }}</h1>
-        <p class="text-zinc-500 font-mono tracking-widest text-xs uppercase mt-2">{{ current_user.role }} • {{ current_user.email }}</p>
+        <h1 class="text-4xl font-black italic uppercase" id="display-name">{{ current_user.name if current_user else '' }}</h1>
+        <p class="text-zinc-500 font-mono tracking-widest text-xs uppercase mt-2">
+            {{ current_user.role }} • {{ current_user.email }}
+        </p>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -27,41 +40,199 @@
             <div class="space-y-6">
                 <div>
                     <label class="block text-[10px] text-zinc-500 uppercase font-bold mb-2">Display Name</label>
-                    <input type="text" value="{{ current_user.name }}" class="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-sm focus:border-red-600/50 outline-none transition-all">
+                    <input type="text" id="input-name" value="{{ current_user.name if current_user else '' }}"
+                           class="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-sm focus:border-red-600/50 outline-none transition-all">
                 </div>
                 <div>
                     <label class="block text-[10px] text-zinc-500 uppercase font-bold mb-2">Email Address</label>
-                    <input type="text" value="{{ current_user.email }}" disabled class="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-sm opacity-50 cursor-not-allowed">
+                    <input type="text" value="{{ current_user.email if current_user else '' }}" disabled
+                           class="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-sm opacity-50 cursor-not-allowed">
                 </div>
-                <button class="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition-all uppercase text-[10px] tracking-widest">Update Profile</button>
+                <button onclick="updateName()"
+                        class="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition-all uppercase text-[10px] tracking-widest active:scale-95">
+                    Update Profile
+                </button>
             </div>
         </div>
 
-        <!-- NOTIFICATIONS -->
+        <!-- PREFERENCES -->
         <div class="glass p-10 rounded-[3rem]">
             <h2 class="text-xs font-bold text-red-600 uppercase tracking-widest mb-8">Preferences</h2>
             <div class="space-y-6">
+                <!-- Email Notifications -->
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-bold">Email Notifications</p>
-                        <p class="text-[10px] text-zinc-500">Receive alerts for SLA breaches</p>
+                        <p class="text-[10px] text-zinc-500">Receive alerts for ticket updates</p>
                     </div>
-                    <div class="w-12 h-6 bg-red-600 rounded-full cursor-pointer relative">
-                        <div class="w-4 h-4 bg-white rounded-full absolute top-1 right-1"></div>
-                    </div>
+                    <button id="email-notif-toggle" onclick="toggleEmailNotif()"
+                            class="w-12 h-6 rounded-full relative transition-colors duration-200 {{ 'bg-red-600' if current_user and current_user.email_notifications else 'bg-zinc-700' }}">
+                        <div id="email-notif-dot" class="w-4 h-4 bg-white rounded-full absolute top-1 transition-all {{ 'right-1' if current_user and current_user.email_notifications else 'left-1' }}"></div>
+                    </button>
                 </div>
+
+                <!-- Theme Toggle -->
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-bold">Theme</p>
-                        <p class="text-[10px] text-zinc-500">Current: Command Center Dark</p>
+                        <p class="text-[10px] text-zinc-500" id="theme-label">Current: Command Center Dark</p>
                     </div>
+                    <button onclick="toggleTheme()"
+                            class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all">
+                        Toggle Theme
+                    </button>
                 </div>
+
+                <!-- Change Password -->
                 <div class="pt-6 border-t border-white/5">
-                    <button class="w-full border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white font-bold py-3 rounded-xl transition-all uppercase text-[10px] tracking-widest">Change Password</button>
+                    <button onclick="document.getElementById('pw-modal').classList.add('open')"
+                            class="w-full border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white font-bold py-3 rounded-xl transition-all uppercase text-[10px] tracking-widest">
+                        Change Password
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Role Badge -->
+    <div class="mt-6 glass p-6 rounded-2xl">
+        <div class="flex items-center gap-6">
+            <div class="text-center">
+                <p class="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">Account Role</p>
+                <p class="text-sm font-black uppercase mt-1 {{ 'text-red-500' if current_user and current_user.role == 'admin' else 'text-blue-400' if current_user and current_user.role == 'agent' else 'text-zinc-300' }}">
+                    {{ current_user.role if current_user else 'user' }}
+                </p>
+            </div>
+            <div class="text-center">
+                <p class="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">Permissions</p>
+                <p class="text-xs text-zinc-400 mt-1">
+                    {% if current_user and current_user.role == 'admin' %}Full system access — manage all tickets, analytics, users
+                    {% elif current_user and current_user.role == 'agent' %}View and update assigned tickets, access ticket queue
+                    {% else %}Submit tickets and view your own submissions{% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- PASSWORD CHANGE MODAL -->
+<div id="pw-modal" class="modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="bg-zinc-900 border border-zinc-800 p-10 rounded-3xl w-full max-w-sm mx-4">
+        <h3 class="text-sm font-black uppercase tracking-widest mb-6">Change Password</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="text-[10px] text-zinc-500 uppercase block mb-1">Current Password</label>
+                <input type="password" id="pw-current" class="w-full bg-black border border-zinc-800 p-3 rounded-xl text-sm outline-none focus:border-red-600 transition-colors">
+            </div>
+            <div>
+                <label class="text-[10px] text-zinc-500 uppercase block mb-1">New Password</label>
+                <input type="password" id="pw-new" class="w-full bg-black border border-zinc-800 p-3 rounded-xl text-sm outline-none focus:border-red-600 transition-colors">
+            </div>
+            <div>
+                <label class="text-[10px] text-zinc-500 uppercase block mb-1">Confirm New Password</label>
+                <input type="password" id="pw-confirm" class="w-full bg-black border border-zinc-800 p-3 rounded-xl text-sm outline-none focus:border-red-600 transition-colors">
+            </div>
+            <p id="pw-error" class="text-red-400 text-xs hidden"></p>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="document.getElementById('pw-modal').classList.remove('open')"
+                    class="flex-1 bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl text-xs font-bold uppercase transition-all">Cancel</button>
+            <button onclick="changePassword()"
+                    class="flex-1 bg-red-600 hover:bg-red-700 py-3 rounded-xl text-xs font-bold uppercase transition-all active:scale-95">Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+    let emailNotifEnabled = {{ 'true' if current_user and current_user.email_notifications else 'false' }};
+
+    function showToast(msg, type='success') {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = `toast ${type} show`;
+        setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    async function updateName() {
+        const name = document.getElementById('input-name').value.trim();
+        if (!name) { showToast('Name cannot be empty', 'error'); return; }
+        const fd = new FormData();
+        fd.append('action', 'update_name');
+        fd.append('name', name);
+        const res  = await fetch('/profile', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('display-name').innerText = data.name;
+            showToast('Profile updated!', 'success');
+        } else {
+            showToast(data.error || 'Update failed', 'error');
+        }
+    }
+
+    async function changePassword() {
+        const current = document.getElementById('pw-current').value;
+        const newPw   = document.getElementById('pw-new').value;
+        const confirm = document.getElementById('pw-confirm').value;
+        const errEl   = document.getElementById('pw-error');
+        errEl.classList.add('hidden');
+        if (newPw !== confirm) {
+            errEl.textContent = 'Passwords do not match.';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        const fd = new FormData();
+        fd.append('action', 'change_password');
+        fd.append('current_password', current);
+        fd.append('new_password', newPw);
+        const res  = await fetch('/profile', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('pw-modal').classList.remove('open');
+            document.getElementById('pw-current').value = '';
+            document.getElementById('pw-new').value     = '';
+            document.getElementById('pw-confirm').value = '';
+            showToast('Password changed successfully!', 'success');
+        } else {
+            errEl.textContent = data.error || 'Failed to change password.';
+            errEl.classList.remove('hidden');
+        }
+    }
+
+    function toggleEmailNotif() {
+        emailNotifEnabled = !emailNotifEnabled;
+        const toggle = document.getElementById('email-notif-toggle');
+        const dot    = document.getElementById('email-notif-dot');
+        if (emailNotifEnabled) {
+            toggle.classList.replace('bg-zinc-700', 'bg-red-600');
+            dot.classList.replace('left-1', 'right-1');
+        } else {
+            toggle.classList.replace('bg-red-600', 'bg-zinc-700');
+            dot.classList.replace('right-1', 'left-1');
+        }
+        savePrefs();
+    }
+
+    function toggleTheme() {
+        const isLight = document.body.classList.toggle('light-mode');
+        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        document.getElementById('theme-label').textContent = `Current: ${isLight ? 'Light Mode' : 'Command Center Dark'}`;
+        savePrefs();
+    }
+
+    async function savePrefs() {
+        const theme = document.body.classList.contains('light-mode') ? 'light' : 'dark';
+        const fd    = new FormData();
+        fd.append('action', 'update_prefs');
+        fd.append('theme', theme);
+        fd.append('email_notifications', emailNotifEnabled ? 'true' : 'false');
+        await fetch('/profile', { method: 'POST', body: fd });
+    }
+
+    // Init theme label
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.getElementById('theme-label').textContent = `Current: ${savedTheme === 'light' ? 'Light Mode' : 'Command Center Dark'}`;
+</script>
 </body>
 </html>

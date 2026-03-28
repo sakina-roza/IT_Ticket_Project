@@ -29,12 +29,22 @@
     </div>
 
     <!-- HEADER -->
-    <div class="flex justify-between items-end mb-6">
+    <div class="flex justify-between items-end mb-4">
         <div>
             <h1 class="text-4xl font-black italic">PERFORMANCE <span class="text-red-600">2026</span></h1>
             <p id="sync-clock" class="text-[10px] font-mono text-zinc-500 mt-2 tracking-widest uppercase">Initializing...</p>
         </div>
-        <button onclick="refreshData()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-all">↺ Refresh</button>
+        <div class="flex gap-3 items-center">
+            <!-- Date filter -->
+            <span class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Filter:</span>
+            <input type="date" id="dash-date-from" onchange="refreshData()"
+                   class="bg-zinc-900 border border-zinc-800 p-2 rounded-xl text-xs text-zinc-400 outline-none focus:border-red-600 transition-colors">
+            <span class="text-zinc-600 text-xs">→</span>
+            <input type="date" id="dash-date-to" onchange="refreshData()"
+                   class="bg-zinc-900 border border-zinc-800 p-2 rounded-xl text-xs text-zinc-400 outline-none focus:border-red-600 transition-colors">
+            <button onclick="clearDashFilter()" class="text-[9px] text-zinc-600 hover:text-red-500 uppercase transition-colors">✕</button>
+            <button onclick="refreshData()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-all">↺ Refresh</button>
+        </div>
     </div>
 
     <!-- KPI CARDS -->
@@ -148,29 +158,8 @@
     let priorityLabels = [], statusLabels = [];
     let currentPeriod = 'weekly';
 
-    async function loadNotifications() {
-        try {
-            const res  = await fetch('/api/notifications');
-            const data = await res.json();
-            const badge = document.getElementById('notif-badge');
-            const list  = document.getElementById('notif-list');
-            if (!badge || !list) return;
-            if (data.length > 0) {
-                badge.textContent = data.length;
-                badge.classList.remove('hidden');
-                list.innerHTML = data.map(n => `
-                    <div class="flex items-start gap-2 border-b border-white/5 pb-2">
-                        <span class="${n.priority==='Critical'?'text-red-400':n.priority==='High'?'text-orange-400':'text-zinc-400'} text-xs mt-0.5">●</span>
-                        <div>
-                            <p class="text-xs font-mono font-bold">${n.id}</p>
-                            <p class="text-[10px] text-zinc-500">${n.message}</p>
-                        </div>
-                    </div>`).join('');
-            } else {
-                badge.classList.add('hidden');
-                list.innerHTML = '<p class="text-xs text-zinc-600 text-center py-4">No recent activity</p>';
-            }
-        } catch(e) {}
+    function loadNotifications() {
+        if (typeof loadNavNotifications === 'function') loadNavNotifications();
     }
 
     // ── Period toggle ─────────────────────────────────────────────────────────
@@ -181,10 +170,21 @@
         refreshData();
     }
 
+    function clearDashFilter() {
+        document.getElementById('dash-date-from').value = '';
+        document.getElementById('dash-date-to').value   = '';
+        refreshData();
+    }
+
     // ── Main data refresh ─────────────────────────────────────────────────────
     async function refreshData() {
         try {
-            const res  = await fetch(`/api/stats?period=${currentPeriod}`);
+            const dateFrom = document.getElementById('dash-date-from').value;
+            const dateTo   = document.getElementById('dash-date-to').value;
+            let url = `/api/stats?period=${currentPeriod}`;
+            if (dateFrom) url += `&date_from=${dateFrom}`;
+            if (dateTo)   url += `&date_to=${dateTo}`;
+            const res  = await fetch(url);
             const data = await res.json();
 
             document.getElementById('kpi-total').innerText    = data.stats.total;

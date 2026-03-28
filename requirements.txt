@@ -6,3 +6,9 @@ itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
 Werkzeug==3.1.7
+pandas>=2.0.0
+openpyxl>=3.1.0
+numpy>=1.24.0
+Flask-Mail==0.10.0
+anthropic>=0.25.0
+python-dotenv>=1.0.0

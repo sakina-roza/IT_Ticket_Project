@@ -1,37 +1,64 @@
 <nav class="flex justify-between items-center mb-10 border-b border-white/5 pb-4">
-    <div class="flex gap-6">
+    <div class="flex gap-6 items-center">
         {% if is_admin_user %}
             <a href="/dashboard" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'dashboard' else 'text-zinc-500 hover:text-white transition-colors' }}">DASHBOARD</a>
             <a href="/tickets"   class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'tickets'   else 'text-zinc-500 hover:text-white transition-colors' }}">TICKETS</a>
             <a href="/manage"    class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'manage'    else 'text-zinc-500 hover:text-white transition-colors' }}">MANAGE</a>
             <a href="/analytics" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'analytics' else 'text-zinc-500 hover:text-white transition-colors' }}">ANALYTICS</a>
             <a href="/sql"       class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'sql'       else 'text-zinc-500 hover:text-white transition-colors' }}">SQL QUERY</a>
+        {% elif is_agent_user %}
+            <a href="/agent/queue" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'agent_queue' else 'text-zinc-500 hover:text-white transition-colors' }}">MY QUEUE</a>
+            <a href="/tickets"     class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'tickets'     else 'text-zinc-500 hover:text-white transition-colors' }}">ALL TICKETS</a>
         {% else %}
             <a href="/my_tickets"    class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'my_tickets'    else 'text-zinc-500 hover:text-white transition-colors' }}">MY TICKETS</a>
             <a href="/create_ticket" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'create_ticket' else 'text-zinc-500 hover:text-white transition-colors' }}">CREATE TICKET</a>
         {% endif %}
     </div>
+
     <div class="flex items-center gap-4">
-        {% if is_admin_user %}
+        <!-- Global Search -->
+        {% if current_user %}
+        <div class="relative">
+            <input type="text" id="global-search" placeholder="Search tickets..."
+                   oninput="handleGlobalSearch(this.value)"
+                   autocomplete="off"
+                   class="bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-xl text-xs text-zinc-300 outline-none focus:border-red-600 w-44 transition-colors">
+            <div id="search-dropdown" class="hidden absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-800 rounded-xl z-50 max-h-52 overflow-y-auto shadow-2xl">
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Notification Bell (all logged-in users) -->
+        {% if current_user %}
         <div class="relative">
             <button onclick="toggleNotif()" class="text-zinc-400 hover:text-white text-xl relative">
                 🔔
                 <span id="notif-badge" class="hidden absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">0</span>
             </button>
-            <div id="notif-dropdown" style="display:none;position:absolute;right:0;top:2rem;width:18rem;background:#111;border:1px solid #333;border-radius:1rem;z-index:50;padding:1rem;">
-                <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Recent Activity</p>
+            <div id="notif-dropdown" style="display:none;position:absolute;right:0;top:2rem;width:20rem;background:#111;border:1px solid #333;border-radius:1rem;z-index:50;padding:1rem;">
+                <div class="flex justify-between items-center mb-3">
+                    <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Notifications</p>
+                    <button onclick="markAllRead()" class="text-[9px] text-zinc-600 hover:text-red-500 uppercase transition-colors">Mark all read</button>
+                </div>
                 <div id="notif-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
             </div>
         </div>
         {% endif %}
+
         <a href="/profile" class="text-xs text-zinc-600 font-mono hover:text-red-500 transition-colors">{{ current_user.name if current_user else '' }}</a>
         <a href="/logout" class="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1 rounded transition-colors">LOGOUT</a>
     </div>
 </nav>
+
 <script>
+    // ── Notification bell ──────────────────────────────────────────────────────
     function toggleNotif() {
         const dd = document.getElementById('notif-dropdown');
-        if (dd) dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+        if (dd) {
+            const isOpen = dd.style.display === 'block';
+            dd.style.display = isOpen ? 'none' : 'block';
+            if (!isOpen) loadNavNotifications();
+        }
     }
     document.addEventListener('click', function(e) {
         if (!e.target.closest('#notif-dropdown') && !e.target.closest('button[onclick="toggleNotif()"]')) {
@@ -39,4 +66,98 @@
             if (dd) dd.style.display = 'none';
         }
     });
+    async function loadNavNotifications() {
+        try {
+            const res  = await fetch('/api/notifications');
+            const data = await res.json();
+            const badge = document.getElementById('notif-badge');
+            const list  = document.getElementById('notif-list');
+            if (!badge || !list) return;
+            const unread = data.filter(n => n.read === false || n.read === undefined);
+            if (data.length > 0) {
+                badge.textContent = data.length;
+                badge.classList.remove('hidden');
+                list.innerHTML = data.map(n => `
+                    <div class="flex items-start gap-2 border-b border-white/5 pb-2 cursor-pointer hover:bg-white/5 rounded p-1" onclick="goToTicket('${n.ticket_id || n.id}', '${n.id}')">
+                        <span class="text-xs mt-0.5 ${n.type==='new_ticket'?'text-green-400':n.type==='comment'?'text-blue-400':'text-red-400'}">●</span>
+                        <div class="flex-1">
+                            <p class="text-xs font-mono font-bold">${n.ticket_id || n.id || ''}</p>
+                            <p class="text-[10px] text-zinc-500">${n.message}</p>
+                            <p class="text-[9px] text-zinc-700">${n.time || ''}</p>
+                        </div>
+                    </div>`).join('');
+            } else {
+                badge.classList.add('hidden');
+                list.innerHTML = '<p class="text-xs text-zinc-600 text-center py-4">No new notifications</p>';
+            }
+        } catch(e) {}
+    }
+    async function markAllRead() {
+        await fetch('/api/notifications/mark_read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const badge = document.getElementById('notif-badge');
+        if (badge) badge.classList.add('hidden');
+        const list = document.getElementById('notif-list');
+        if (list) list.innerHTML = '<p class="text-xs text-zinc-600 text-center py-4">No new notifications</p>';
+    }
+    function goToTicket(ticketId, notifId) {
+        if (notifId) {
+            fetch('/api/notifications/mark_read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: notifId })
+            });
+        }
+        if (ticketId && ticketId !== 'undefined') window.location.href = `/tickets/${ticketId}`;
+    }
+
+    // ── Global Search ──────────────────────────────────────────────────────────
+    let searchTimer;
+    async function handleGlobalSearch(val) {
+        clearTimeout(searchTimer);
+        const dd = document.getElementById('search-dropdown');
+        if (!val || val.length < 2) { dd.classList.add('hidden'); return; }
+        searchTimer = setTimeout(async () => {
+            try {
+                const res  = await fetch(`/api/search?q=${encodeURIComponent(val)}`);
+                const data = await res.json();
+                if (data.length === 0) {
+                    dd.innerHTML = '<p class="text-[10px] text-zinc-600 text-center py-3 px-4">No results found</p>';
+                } else {
+                    dd.innerHTML = data.map(r => `
+                        <a href="${r.url}" class="block px-4 py-2.5 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
+                            <p class="text-xs font-bold font-mono text-red-400">${r.id}</p>
+                            <p class="text-[10px] text-zinc-500">${r.label.split('—')[1] || ''}</p>
+                        </a>`).join('');
+                }
+                dd.classList.remove('hidden');
+            } catch(e) {}
+        }, 300);
+    }
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#search-dropdown') && !e.target.closest('#global-search')) {
+            const dd = document.getElementById('search-dropdown');
+            if (dd) dd.classList.add('hidden');
+        }
+    });
+
+    // ── Theme: apply saved theme on load ──────────────────────────────────────
+    (function() {
+        const theme = localStorage.getItem('theme') || 'dark';
+        if (theme === 'light') document.body.classList.add('light-mode');
+    })();
+
+    // Load notifications badge count on page load
+    (function() {
+        fetch('/api/notifications').then(r=>r.json()).then(data => {
+            const badge = document.getElementById('notif-badge');
+            if (badge && data.length > 0) {
+                badge.textContent = data.length;
+                badge.classList.remove('hidden');
+            }
+        }).catch(()=>{});
+    })();
 </script>

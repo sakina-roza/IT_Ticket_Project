@@ -7,6 +7,8 @@
     <style>
         body { background: #050505; color: white; font-family: sans-serif; }
         .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); backdrop-filter: blur(10px); }
+        body.light-mode { background: #f4f4f5; color: #18181b; }
+        body.light-mode .glass { background: rgba(0,0,0,0.03); border-color: rgba(220,38,38,0.3); }
     </style>
 </head>
 <body class="p-6">
@@ -14,14 +16,26 @@
     {% set active = 'analytics' %}
     {% include 'nav.html' %}
 
-    <div class="mb-8">
-        <h1 class="text-4xl font-black italic uppercase">DEEP <span class="text-red-600">ANALYTICS</span></h1>
-        <p class="text-xs text-zinc-500 mt-1 uppercase tracking-widest">Comprehensive performance tracking and SLA compliance audit</p>
+    <div class="flex justify-between items-end mb-8">
+        <div>
+            <h1 class="text-4xl font-black italic uppercase">DEEP <span class="text-red-600">ANALYTICS</span></h1>
+            <p class="text-xs text-zinc-500 mt-1 uppercase tracking-widest">Comprehensive performance tracking and SLA compliance audit</p>
+        </div>
+        <!-- DATE FILTER -->
+        <div class="flex gap-3 items-center">
+            <span class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Period:</span>
+            <input type="date" id="ana-date-from" onchange="loadAnalytics()"
+                   class="bg-zinc-900 border border-zinc-800 p-2 rounded-xl text-xs text-zinc-400 outline-none focus:border-red-600 transition-colors">
+            <span class="text-zinc-600 text-xs">→</span>
+            <input type="date" id="ana-date-to" onchange="loadAnalytics()"
+                   class="bg-zinc-900 border border-zinc-800 p-2 rounded-xl text-xs text-zinc-400 outline-none focus:border-red-600 transition-colors">
+            <button onclick="clearFilter()" class="text-[9px] text-zinc-600 hover:text-red-500 uppercase transition-colors">✕ Clear</button>
+        </div>
     </div>
 
     <!-- MAIN GRID -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        
+
         <!-- SLA COMPLIANCE -->
         <div class="glass p-8 rounded-[2.5rem]">
             <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6 text-center">SLA Compliance Rate</p>
@@ -31,6 +45,11 @@
                     <span id="sla-rate" class="text-4xl font-black text-red-600">--%</span>
                     <span class="text-[10px] text-zinc-500 uppercase">Target: 95%</span>
                 </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+                <div><p class="text-[9px] text-green-500 uppercase">On Track</p><p id="sla-ok-count" class="font-bold text-green-400">--</p></div>
+                <div><p class="text-[9px] text-yellow-500 uppercase">Near</p><p id="sla-near-count" class="font-bold text-yellow-400">--</p></div>
+                <div><p class="text-[9px] text-red-500 uppercase">Breached</p><p id="sla-breach-count" class="font-bold text-red-400">--</p></div>
             </div>
         </div>
 
@@ -47,7 +66,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <!-- MONTHLY TREND -->
         <div class="glass p-8 rounded-[2.5rem]">
             <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6">Historical Volume (Monthly)</p>
@@ -56,124 +75,191 @@
 
         <!-- AGENT TABLE -->
         <div class="glass p-8 rounded-[2.5rem]">
-            <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6">Agent Efficiency Audit</p>
-            <div class="overflow-x-auto">
+            <div class="flex justify-between items-center mb-6">
+                <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest">Agent Efficiency Audit</p>
+                <div class="flex gap-2">
+                    <input type="date" id="perf-from" onchange="loadAgentPerf()"
+                           class="bg-zinc-900 border border-zinc-800 p-1 rounded-lg text-[10px] text-zinc-400 outline-none">
+                    <input type="date" id="perf-to" onchange="loadAgentPerf()"
+                           class="bg-zinc-900 border border-zinc-800 p-1 rounded-lg text-[10px] text-zinc-400 outline-none">
+                </div>
+            </div>
+            <div class="overflow-x-auto max-h-72 overflow-y-auto">
                 <table class="w-full text-left text-xs">
-                    <thead class="text-zinc-500 uppercase tracking-tighter">
+                    <thead class="text-zinc-500 uppercase tracking-tighter sticky top-0 bg-black/80">
                         <tr class="border-b border-white/5">
                             <th class="py-3">Agent</th>
                             <th class="py-3 text-center">Total</th>
                             <th class="py-3 text-center">Resolved</th>
+                            <th class="py-3 text-center">Rate%</th>
+                            <th class="py-3 text-center">SLA Breach</th>
                             <th class="py-3 text-right">Avg Res (h)</th>
                         </tr>
                     </thead>
-                    <tbody id="agent-table-body"></tbody>
+                    <tbody id="agent-table-body">
+                        <tr><td colspan="6" class="py-6 text-center text-zinc-600">Loading...</td></tr>
+                    </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- SLA ALERTS TABLE -->
+    <div class="glass p-8 rounded-[2.5rem]">
+        <p class="text-xs font-bold text-red-600 uppercase tracking-widest mb-6">Active SLA Alerts</p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-zinc-500 uppercase tracking-tighter">
+                    <tr class="border-b border-white/5">
+                        <th class="py-3">Ticket</th>
+                        <th class="py-3">Priority</th>
+                        <th class="py-3">Category</th>
+                        <th class="py-3">Assigned To</th>
+                        <th class="py-3 text-center">Elapsed</th>
+                        <th class="py-3 text-center">SLA Limit</th>
+                        <th class="py-3 text-right">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="sla-alerts-body">
+                    <tr><td colspan="7" class="py-6 text-center text-zinc-600">Loading...</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
 <script>
+    let slaChart, categoryChart, priorityChart, monthlyChart;
+
+    function clearFilter() {
+        document.getElementById('ana-date-from').value = '';
+        document.getElementById('ana-date-to').value   = '';
+        loadAnalytics();
+    }
+
     async function loadAnalytics() {
         try {
-            const res = await fetch('/api/stats?period=monthly');
+            const dateFrom = document.getElementById('ana-date-from').value;
+            const dateTo   = document.getElementById('ana-date-to').value;
+            let url = '/api/stats?period=monthly';
+            if (dateFrom) url += `&date_from=${dateFrom}`;
+            if (dateTo)   url += `&date_to=${dateTo}`;
+
+            const res  = await fetch(url);
             const data = await res.json();
 
-            // SLA Chart (Gauge style)
-            const total = data.stats.total || 1;
+            const total   = data.stats.total || 1;
             const breached = data.sla.breached || 0;
-            const ok = total - breached;
-            const rate = Math.round((ok/total)*100);
-            document.getElementById('sla-rate').innerText = rate + '%';
+            const ok       = total - breached;
+            const rate     = Math.round((ok/total)*100);
+            document.getElementById('sla-rate').innerText       = rate + '%';
+            document.getElementById('sla-ok-count').innerText   = data.sla.on_track || 0;
+            document.getElementById('sla-near-count').innerText = data.sla.near_breach || 0;
+            document.getElementById('sla-breach-count').innerText = data.sla.breached || 0;
 
-            new Chart(document.getElementById('slaChart'), {
+            if (slaChart) slaChart.destroy();
+            slaChart = new Chart(document.getElementById('slaChart'), {
                 type: 'doughnut',
-                data: {
-                    datasets: [{
-                        data: [ok, breached],
-                        backgroundColor: ['#dc2626', '#18181b'],
-                        borderWidth: 0,
-                        circumference: 270,
-                        rotation: 225
-                    }]
-                },
+                data: { datasets: [{ data: [ok, breached], backgroundColor: ['#dc2626','#18181b'], borderWidth: 0, circumference: 270, rotation: 225 }] },
                 options: { cutout: '85%', plugins: { legend: { display: false } } }
             });
 
-            // Category Chart
-            new Chart(document.getElementById('categoryChart'), {
+            if (categoryChart) categoryChart.destroy();
+            categoryChart = new Chart(document.getElementById('categoryChart'), {
                 type: 'polarArea',
                 data: {
                     labels: Object.keys(data.category_counts),
-                    datasets: [{
-                        data: Object.values(data.category_counts),
-                        backgroundColor: ['rgba(220,38,38,0.6)', 'rgba(249,115,22,0.6)', 'rgba(234,179,8,0.6)', 'rgba(34,197,94,0.6)', 'rgba(59,130,246,0.6)'],
-                        borderWidth: 0
-                    }]
+                    datasets: [{ data: Object.values(data.category_counts),
+                        backgroundColor: ['rgba(220,38,38,0.6)','rgba(249,115,22,0.6)','rgba(234,179,8,0.6)','rgba(34,197,94,0.6)','rgba(59,130,246,0.6)','rgba(168,85,247,0.6)','rgba(236,72,153,0.6)','rgba(20,184,166,0.6)'],
+                        borderWidth: 0 }]
                 },
-                options: { 
-                    scales: { r: { grid: { color: '#222' }, ticks: { display: false } } },
-                    plugins: { legend: { position: 'bottom', labels: { color: '#888', font:{size:9}, boxWidth: 10 } } }
-                }
+                options: { scales: { r: { grid: { color: '#222' }, ticks: { display: false } } },
+                    plugins: { legend: { position: 'bottom', labels: { color: '#888', font:{size:9}, boxWidth: 10 } } } }
             });
 
-            // Priority Chart
-            new Chart(document.getElementById('priorityChart'), {
+            if (priorityChart) priorityChart.destroy();
+            priorityChart = new Chart(document.getElementById('priorityChart'), {
                 type: 'bar',
-                data: {
-                    labels: Object.keys(data.priority_counts),
-                    datasets: [{
-                        data: Object.values(data.priority_counts),
-                        backgroundColor: '#dc2626',
-                        borderRadius: 8
-                    }]
-                },
+                data: { labels: Object.keys(data.priority_counts), datasets: [{ data: Object.values(data.priority_counts), backgroundColor: '#dc2626', borderRadius: 8 }] },
                 options: {
                     plugins: { legend: { display: false } },
                     scales: { x: { grid: { display: false }, ticks: { color: '#555' } }, y: { grid: { color: '#111' }, ticks: { color: '#555' } } }
                 }
             });
 
-            // Monthly Trend
-            new Chart(document.getElementById('monthlyChart'), {
+            if (monthlyChart) monthlyChart.destroy();
+            monthlyChart = new Chart(document.getElementById('monthlyChart'), {
                 type: 'line',
-                data: {
-                    labels: data.trend.labels,
-                    datasets: [{
-                        label: 'Tickets',
-                        data: data.trend.values,
-                        borderColor: '#dc2626',
-                        backgroundColor: 'rgba(220,38,38,0.1)',
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
+                data: { labels: data.trend.labels, datasets: [{ label: 'Tickets', data: data.trend.values, borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.1)', fill: true, tension: 0.4 }] },
                 options: {
                     plugins: { legend: { display: false } },
                     scales: { x: { grid: { color: '#111' }, ticks: { color: '#555' } }, y: { grid: { color: '#111' }, ticks: { color: '#555' } } }
                 }
             });
 
-            // Agent Table (Hardcoded simulation or from stats if available)
-            // Note: The /api/stats in app.py current version doesn't return full agent breakdown in the same way our old one did.
-            // I'll use the available agents data or mock it if missing.
-            const table = document.getElementById('agent-table-body');
-            // Assuming data.agent_perf is available (if I add it to app.py)
-            // But let's build a simple one from what we have.
-            const agents = ["Admin", "Agent Alpha", "Agent Beta", "Unassigned"];
-            table.innerHTML = agents.map(a => `
-                <tr class="border-b border-white/5 hover:bg-white/5">
-                    <td class="py-4 font-bold">${a}</td>
-                    <td class="py-4 text-center text-zinc-400">${Math.floor(Math.random()*50)}</td>
-                    <td class="py-4 text-center text-zinc-400">${Math.floor(Math.random()*40)}</td>
-                    <td class="py-4 text-right font-mono text-red-500">${(Math.random()*48).toFixed(1)}h</td>
-                </tr>
-            `).join('');
-
         } catch(e) { console.error(e); }
     }
+
+    async function loadAgentPerf() {
+        try {
+            const dateFrom = document.getElementById('perf-from').value;
+            const dateTo   = document.getElementById('perf-to').value;
+            let url = '/api/agent_perf';
+            const params = [];
+            if (dateFrom) params.push(`date_from=${dateFrom}`);
+            if (dateTo)   params.push(`date_to=${dateTo}`);
+            if (params.length) url += '?' + params.join('&');
+
+            const res  = await fetch(url);
+            const data = await res.json();
+            const table = document.getElementById('agent-table-body');
+            if (!data.length) {
+                table.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-zinc-600">No agent data available</td></tr>';
+                return;
+            }
+            table.innerHTML = data.map(a => `
+                <tr class="border-b border-white/5 hover:bg-white/5">
+                    <td class="py-3 font-bold text-white">${a.agent}</td>
+                    <td class="py-3 text-center text-zinc-400">${a.total}</td>
+                    <td class="py-3 text-center text-zinc-400">${a.resolved}</td>
+                    <td class="py-3 text-center ${a.resolution_rate >= 80 ? 'text-green-400' : a.resolution_rate >= 50 ? 'text-yellow-400' : 'text-red-400'}">${a.resolution_rate}%</td>
+                    <td class="py-3 text-center ${a.sla_breaches > 0 ? 'text-red-400' : 'text-zinc-600'}">${a.sla_breaches}</td>
+                    <td class="py-3 text-right font-mono text-red-500">${a.avg_res}h</td>
+                </tr>
+            `).join('');
+        } catch(e) { console.error(e); }
+    }
+
+    async function loadSlaAlerts() {
+        try {
+            const res  = await fetch('/api/sla_alerts');
+            const data = await res.json();
+            const tbody = document.getElementById('sla-alerts-body');
+            if (!data.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-green-600 text-xs">No active SLA alerts — all tickets within SLA limits</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(a => `
+                <tr class="border-b border-white/5 hover:bg-white/5">
+                    <td class="py-3"><a href="/tickets/${a.ticket_id}" class="font-mono font-bold hover:text-red-500 transition-colors">${a.ticket_id}</a></td>
+                    <td class="py-3 ${a.priority==='Critical'?'text-red-400':a.priority==='High'?'text-orange-400':'text-yellow-400'} font-bold">${a.priority}</td>
+                    <td class="py-3 text-zinc-400">${a.category}</td>
+                    <td class="py-3 text-zinc-400">${a.assigned_to}</td>
+                    <td class="py-3 text-center font-mono">${a.elapsed_hours}h</td>
+                    <td class="py-3 text-center font-mono text-zinc-500">${a.sla_hours}h</td>
+                    <td class="py-3 text-right">
+                        <span class="px-2 py-1 rounded-lg text-[9px] font-bold uppercase ${a.status==='breached'?'bg-red-600/20 text-red-400':'bg-yellow-600/20 text-yellow-400'}">
+                            ${a.status === 'breached' ? '🔴 BREACHED' : '🟡 NEAR BREACH'} (${a.sla_pct}%)
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        } catch(e) { console.error(e); }
+    }
+
     loadAnalytics();
+    loadAgentPerf();
+    loadSlaAlerts();
 </script>
 </body>
 </html>

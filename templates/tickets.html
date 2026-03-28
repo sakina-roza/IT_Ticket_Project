@@ -97,7 +97,11 @@
 
 <script>
     let allData = [];
-    let selectedIds = new Set();
+    let selectedIds  = new Set();
+    let currentPage  = 1;
+    let totalPages   = 1;
+    let totalRecords = 0;
+    const pageSize   = 10;
 
     const SLA_COLOR = { on_track: 'text-green-400', near_breach: 'text-yellow-400', breached: 'text-red-400', unknown: 'text-zinc-600' };
     const SLA_LABEL = { on_track: '🟢 OK', near_breach: '🟡 Near', breached: '🔴 Breach', unknown: '⚪ N/A' };
@@ -110,23 +114,37 @@
     if (urlParams.get('date_from')) document.getElementById('f-date-from').value = urlParams.get('date_from');
     if (urlParams.get('date_to'))   document.getElementById('f-date-to').value   = urlParams.get('date_to');
 
-    async function loadTable() {
-        const params = new URLSearchParams();
+    async function loadTable(page) {
+        if (page !== undefined) currentPage = page;
+        const params   = new URLSearchParams();
         const search   = document.getElementById('f-search').value.trim();
         const status   = document.getElementById('f-status').value;
         const priority = document.getElementById('f-priority').value;
         const dateFrom = document.getElementById('f-date-from').value;
         const dateTo   = document.getElementById('f-date-to').value;
 
-        if (search)   params.set('search',    search);
+        if (search)             params.set('search',    search);
         if (status   !== 'All') params.set('status',    status);
         if (priority !== 'All') params.set('priority',  priority);
-        if (dateFrom) params.set('date_from', dateFrom);
-        if (dateTo)   params.set('date_to',   dateTo);
+        if (dateFrom)           params.set('date_from', dateFrom);
+        if (dateTo)             params.set('date_to',   dateTo);
+        params.set('page',      currentPage);
+        params.set('page_size', pageSize);
 
         try {
-            const res = await fetch('/api/all_tickets?' + params.toString());
-            allData = await res.json();
+            const res    = await fetch('/api/all_tickets?' + params.toString());
+            const result = await res.json();
+            // Support both paginated (object) and legacy (array) responses
+            if (Array.isArray(result)) {
+                allData      = result;
+                totalRecords = result.length;
+                totalPages   = Math.ceil(totalRecords / pageSize);
+            } else {
+                allData      = result.data || [];
+                totalRecords = result.total || 0;
+                totalPages   = result.total_pages || 1;
+                currentPage  = result.page || 1;
+            }
         } catch(e) {
             allData = [];
         }
@@ -135,9 +153,6 @@
         renderTable();
         updateBulkBar();
     }
-
-    let currentPage = 1;
-    const pageSize = 10;
 
     function renderTable() {
         const tbody = document.getElementById('table-body');
@@ -154,18 +169,12 @@
             return;
         }
         empty.classList.add('hidden');
-        
-        const total = allData.length;
-        const totalPages = Math.ceil(total / pageSize);
-        if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
-        
-        const start = (currentPage - 1) * pageSize;
-        const end   = Math.min(start + pageSize, total);
-        const pageData = allData.slice(start, end);
 
-        count.textContent = `Showing ${start+1}-${end} of ${total} records`;
+        const start = (currentPage - 1) * pageSize + 1;
+        const end   = start + allData.length - 1;
+        count.textContent = `Showing ${start}-${end} of ${totalRecords} records`;
 
-        tbody.innerHTML = pageData.map(t => {
+        tbody.innerHTML = allData.map(t => {
             const slaClass = SLA_COLOR[t.SLA_Status] || 'text-zinc-600';
             const slaLabel = SLA_LABEL[t.SLA_Status] || '⚪ N/A';
             const priClass = PRI_COLOR[t.Priority]   || 'text-white';
@@ -187,15 +196,33 @@
             `;
         }).join('');
 
-        // Render pagination buttons
+        // Render server-side pagination buttons
         pagin.innerHTML = '';
         if (totalPages > 1) {
-            for (let i = 1; i <= totalPages; i++) {
+            if (currentPage > 1) {
+                const prev = document.createElement('button');
+                prev.innerText = '←';
+                prev.className = 'w-8 h-8 rounded-lg text-[10px] font-black transition-all bg-zinc-900 text-zinc-500 hover:bg-zinc-800';
+                prev.onclick   = () => loadTable(currentPage - 1);
+                pagin.appendChild(prev);
+            }
+            const maxBtns = 7;
+            let startP = Math.max(1, currentPage - 3);
+            let endP   = Math.min(totalPages, startP + maxBtns - 1);
+            if (endP - startP < maxBtns - 1) startP = Math.max(1, endP - maxBtns + 1);
+            for (let i = startP; i <= endP; i++) {
                 const btn = document.createElement('button');
                 btn.innerText = i;
                 btn.className = `w-8 h-8 rounded-lg text-[10px] font-black transition-all ${i === currentPage ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-500 hover:bg-zinc-800'}`;
-                btn.onclick = () => { currentPage = i; renderTable(); };
+                btn.onclick   = () => loadTable(i);
                 pagin.appendChild(btn);
+            }
+            if (currentPage < totalPages) {
+                const next = document.createElement('button');
+                next.innerText = '→';
+                next.className = 'w-8 h-8 rounded-lg text-[10px] font-black transition-all bg-zinc-900 text-zinc-500 hover:bg-zinc-800';
+                next.onclick   = () => loadTable(currentPage + 1);
+                pagin.appendChild(next);
             }
         }
     }
@@ -246,7 +273,7 @@
         if (data.success) {
             alert(`✅ Updated ${data.updated} ticket(s).`);
             clearSelection();
-            loadTable();
+            loadTable(1);
         } else {
             alert('Error: ' + (data.error || 'Unknown error'));
         }
