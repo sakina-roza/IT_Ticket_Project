@@ -1,6 +1,6 @@
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session, Response
 import pandas as pd
-import os, io, json, random, re, sqlite3, secrets, uuid
+import os, io, json, random, re, secrets, uuid
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -13,6 +13,17 @@ USERS_FILE   = 'users.json'
 COMMENTS_FILE= 'comments.json'
 HISTORY_FILE = 'ticket_history.json'
 NOTIF_FILE   = 'notifications.json'
+NOTES_FILE   = 'internal_notes.json'
+CANNED_FILE  = 'canned_responses.json'
+CHAT_FILE    = 'chat_messages.json'
+
+DEFAULT_CANNED = [
+    {"id": "cr1", "label": "Acknowledge",          "body": "Thank you for reaching out. I've picked up your ticket and will begin investigating shortly."},
+    {"id": "cr2", "label": "Need More Info",        "body": "Could you please provide more details? Specifically: when did it start, what steps you've already tried, and any error messages you're seeing."},
+    {"id": "cr3", "label": "Resolved",              "body": "I'm happy to let you know your issue has been resolved. Please reopen the ticket if you experience any further problems."},
+    {"id": "cr4", "label": "Escalating",            "body": "Your ticket is being escalated to a senior technician for further investigation. We'll keep you updated on progress."},
+    {"id": "cr5", "label": "Scheduled Maintenance", "body": "This issue is related to scheduled maintenance. Normal service will be restored shortly. Apologies for the inconvenience."},
+]
 UPLOAD_FOLDER= os.path.join('static', 'uploads')
 ALLOWED_EXTENSIONS = {'png','jpg','jpeg','gif','pdf','txt','docx','xlsx','zip','log'}
 
@@ -109,6 +120,54 @@ def is_agent():
 def is_admin_or_agent():
     u = current_user_info()
     return u and u["role"] in ("admin", "agent")
+
+# ── Agent workload + skill-based routing ───────────────────────────────────────
+
+def _get_agent_workload(email):
+    """Count open/in-progress tickets currently assigned to an agent."""
+    df = get_safe_data()
+    if df.empty or 'Assigned_To' not in df.columns:
+        return 0
+    users = get_users()
+    name  = users.get(email, {}).get('name', '')
+    mask  = (
+        (df['Assigned_To'].astype(str).str.strip() == email) |
+        (df['Assigned_To'].astype(str).str.strip() == name)
+    ) & (~df['Status'].isin(['Resolved', 'Closed']))
+    return int(mask.sum())
+
+def _find_best_agent(category, priority):
+    """
+    Skill-based, availability-aware, load-balanced agent selection.
+    Returns the best agent email or None.
+    Preference order:
+      1. Available agents whose skills include `category`, lowest workload first
+      2. Any available agent under max_workload, lowest workload first
+    """
+    users = get_users()
+    available_agents = [
+        (email, u) for email, u in users.items()
+        if u.get('role') == 'agent'
+        and u.get('availability_status', 'online') == 'online'
+    ]
+    if not available_agents:
+        return None
+
+    candidates = []
+    for email, u in available_agents:
+        workload  = _get_agent_workload(email)
+        max_wl    = u.get('max_workload', 10)
+        if workload >= max_wl:
+            continue
+        has_skill = category in u.get('skills', [])
+        candidates.append((email, workload, has_skill))
+
+    if not candidates:
+        return None
+
+    # Sort: skill match first (True > False in reverse), then by workload asc
+    candidates.sort(key=lambda x: (not x[2], x[1]))
+    return candidates[0][0]
 
 # ── Context processor ──────────────────────────────────────────────────────────
 @app.context_processor
@@ -375,17 +434,12 @@ def manage():
     if not is_admin():        return redirect(url_for('my_tickets'))
     return render_template('manage.html')
 
-@app.route('/analytics')
-def analytics():
+@app.route('/manage_users')
+def manage_users():
     if 'user' not in session: return redirect(url_for('login'))
     if not is_admin():        return redirect(url_for('my_tickets'))
-    return render_template('analytics.html')
+    return render_template('manage_users.html')
 
-@app.route('/sql')
-def sql_console():
-    if 'user' not in session: return redirect(url_for('login'))
-    if not is_admin():        return redirect(url_for('my_tickets'))
-    return render_template('sql_query.html')
 
 # ── Ticket detail (accessible by admin, agents, and ticket owner) ──────────────
 
@@ -435,6 +489,14 @@ def profile():
 
     return render_template('profile.html')
 
+# ── Agent dashboard ────────────────────────────────────────────────────────────
+
+@app.route('/agent/dashboard')
+def agent_dashboard():
+    if 'user' not in session:   return redirect(url_for('login'))
+    if not is_admin_or_agent(): return redirect(url_for('my_tickets'))
+    return render_template('agent_dashboard.html')
+
 # ── Agent queue ────────────────────────────────────────────────────────────────
 
 @app.route('/agent/queue')
@@ -456,6 +518,12 @@ def my_tickets():
     return render_template('my_tickets.html')
 
 # ── APIs ───────────────────────────────────────────────────────────────────────
+
+@app.route('/api/tickets/count')
+def ticket_count():
+    if 'user' not in session: return jsonify({"count": 0})
+    df = get_safe_data()
+    return jsonify({"count": len(df)})
 
 @app.route('/api/stats')
 def stats():
@@ -518,7 +586,8 @@ def stats():
             "insights": {"tickets_today": tickets_today, "sla_breaches": sla_counts['breached'], "avg_res": avg_res},
             "priority_counts":  df['Priority'].value_counts().to_dict(),
             "status_counts":    df['Status'].value_counts().to_dict(),
-            "category_counts":  df['Category'].value_counts().to_dict() if 'Category' in df.columns else {}
+            "category_counts":  df['Category'].value_counts().to_dict() if 'Category' in df.columns else {},
+            "agent_perf":       _build_agent_perf(df)
         })
     except Exception as e:
         print(f"API Error: {e}")
@@ -603,12 +672,16 @@ def submit_ticket():
     tid = generate_ticket_id()
     u   = current_user_info()
 
+    # Auto-assign via skill-based routing
+    assigned_to  = _find_best_agent(category, priority) or 'Unassigned'
+    initial_status = 'In Progress' if assigned_to != 'Unassigned' else 'Open'
+
     new_row = {
         'Ticket_ID':             tid,
-        'Status':                'Open',
+        'Status':                initial_status,
         'Priority':              priority,
         'Category':              category,
-        'Assigned_To':           'Unassigned',
+        'Assigned_To':           assigned_to,
         'Created_Date':          datetime.now().strftime('%Y-%m-%d %H:%M'),
         'Resolution_Time_Hours': '',
         'Created_By':            session['user'],
@@ -619,8 +692,17 @@ def submit_ticket():
     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df.to_excel(EXCEL_FILE, index=False)
 
+    assign_detail = f"Auto-assigned to {assigned_to}" if assigned_to != 'Unassigned' else "No available agent — set to Unassigned"
     log_ticket_event(tid, u['email'], u['name'], 'created',
-                     f"Ticket created — Category: {category}, Priority: {priority}")
+                     f"Ticket created — Category: {category}, Priority: {priority}. {assign_detail}")
+
+    # Notify assigned agent
+    if assigned_to != 'Unassigned':
+        add_notification(assigned_to,
+            f"New ticket {tid} auto-assigned to you: {category} ({priority})", tid, 'new_ticket')
+        send_email_notification(assigned_to, f"Ticket {tid} Assigned to You",
+            f"<p>Ticket <b>{tid}</b> ({category}, {priority}) has been auto-assigned to you.</p>"
+            f"<p>Description: {desc[:200]}</p>")
 
     # Notify all admins
     for email, user_data in get_users().items():
@@ -879,6 +961,35 @@ def get_attachments(ticket_id):
     files = [f.strip() for f in raw.split(',') if f.strip()]
     return jsonify([{"filename": f, "url": f"/static/uploads/{f}"} for f in files])
 
+# ── Internal Notes API (agent/admin only) ─────────────────────────────────────
+
+@app.route('/api/tickets/<ticket_id>/notes', methods=['GET'])
+def get_internal_notes(ticket_id):
+    if 'user' not in session:   return jsonify([])
+    if not is_admin_or_agent(): return jsonify([])
+    data = _read_json(NOTES_FILE, {})
+    return jsonify(data.get(ticket_id, []))
+
+@app.route('/api/tickets/<ticket_id>/notes', methods=['POST'])
+def post_internal_note(ticket_id):
+    if 'user' not in session:   return jsonify({"success": False}), 401
+    if not is_admin_or_agent(): return jsonify({"success": False, "error": "Agents only"}), 403
+    body = (request.get_json() or {}).get('body', '').strip()
+    if not body:
+        return jsonify({"success": False, "error": "Empty note"})
+    u    = current_user_info()
+    note = {
+        "id":     str(uuid.uuid4())[:8],
+        "author": u['name'],
+        "email":  u['email'],
+        "body":   body,
+        "time":   datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    data = _read_json(NOTES_FILE, {})
+    data.setdefault(ticket_id, []).append(note)
+    _write_json(NOTES_FILE, data)
+    return jsonify({"success": True, "note": note})
+
 # ── Notifications API ──────────────────────────────────────────────────────────
 
 @app.route('/api/notifications')
@@ -934,11 +1045,40 @@ def api_agent_queue():
     mask  = (df['Assigned_To'].astype(str).str.strip() == email) | \
             (df['Assigned_To'].astype(str).str.strip() == name)
     df    = df[mask].fillna('')
-    if 'Resolution_Time_Hours' in df.columns and 'Priority' in df.columns:
-        df = df.copy()
-        df['SLA_Status'] = df.apply(
-            lambda r: get_sla_status(r['Priority'], r['Resolution_Time_Hours']), axis=1)
-    return jsonify(df.to_dict(orient='records'))
+    now   = datetime.now()
+    records = []
+    for _, row in df.iterrows():
+        r = row.to_dict()
+        priority = str(r.get('Priority', 'Low'))
+        sla_hrs  = SLA_HOURS.get(priority, 24)
+        status   = str(r.get('Status', ''))
+        created  = row.get('Created_Date')
+        if status not in ('Resolved', 'Closed') and pd.notna(created):
+            try:
+                created_dt = pd.to_datetime(created)
+                deadline   = created_dt + timedelta(hours=sla_hrs)
+                remaining_s = (deadline - now).total_seconds()
+                elapsed_s   = (now - created_dt).total_seconds()
+                elapsed_h   = elapsed_s / 3600
+                pct         = (elapsed_h / sla_hrs) * 100
+                r['SLA_Remaining_Seconds'] = int(remaining_s)
+                r['SLA_Total_Seconds']     = int(sla_hrs * 3600)
+                if remaining_s < 0:
+                    r['SLA_Status'] = 'breached'
+                elif pct >= 75:
+                    r['SLA_Status'] = 'near_breach'
+                else:
+                    r['SLA_Status'] = 'on_track'
+            except Exception:
+                r['SLA_Status'] = 'unknown'
+                r['SLA_Remaining_Seconds'] = None
+                r['SLA_Total_Seconds']     = None
+        else:
+            r['SLA_Status'] = 'unknown'
+            r['SLA_Remaining_Seconds'] = None
+            r['SLA_Total_Seconds']     = None
+        records.append(r)
+    return jsonify(records)
 
 # ── Admin user management API ──────────────────────────────────────────────────
 
@@ -946,23 +1086,133 @@ def api_agent_queue():
 def admin_get_users():
     if not is_admin(): return jsonify([])
     users = get_users()
-    return jsonify([
-        {"email": e, "name": u.get("name",""), "role": u.get("role","user")}
-        for e, u in users.items()
-    ])
+    result = []
+    for e, u in users.items():
+        workload = _get_agent_workload(e) if u.get('role') == 'agent' else 0
+        result.append({
+            "email":               e,
+            "name":                u.get("name", ""),
+            "role":                u.get("role", "user"),
+            "availability_status": u.get("availability_status", "online"),
+            "skills":              u.get("skills", []),
+            "max_workload":        u.get("max_workload", 10),
+            "current_workload":    workload
+        })
+    return jsonify(result)
 
 @app.route('/api/admin/users', methods=['POST'])
 def admin_update_user():
-    if not is_admin(): return jsonify({"success": False})
+    if not is_admin(): return jsonify({"success": False, "error": "Unauthorized"})
     data  = request.get_json()
-    email = data.get('email', '')
+    email = data.get('email', '').strip()
     users = get_users()
     if email not in users:
         return jsonify({"success": False, "error": "User not found"})
+    u = users[email]
     if 'role' in data and data['role'] in ('admin', 'agent', 'user'):
-        users[email]['role'] = data['role']
-        save_users(users)
+        u['role'] = data['role']
+    if 'name' in data and str(data['name']).strip():
+        u['name'] = str(data['name']).strip()
+    if 'skills' in data and isinstance(data['skills'], list):
+        u['skills'] = [s for s in data['skills'] if s in list(CLASSIFY_RULES.keys()) + ['Other']]
+    if 'max_workload' in data:
+        try:
+            u['max_workload'] = max(1, int(data['max_workload']))
+        except (ValueError, TypeError):
+            pass
+    if 'availability_status' in data and data['availability_status'] in ('online', 'away', 'busy'):
+        u['availability_status'] = data['availability_status']
+    save_users(users)
     return jsonify({"success": True})
+
+@app.route('/api/admin/users/create', methods=['POST'])
+def admin_create_user():
+    if not is_admin(): return jsonify({"success": False, "error": "Unauthorized"})
+    data  = request.get_json()
+    email = data.get('email', '').strip()
+    name  = data.get('name', '').strip()
+    pw    = data.get('password', '').strip()
+    role  = data.get('role', 'user')
+    if not email or not name or not pw:
+        return jsonify({"success": False, "error": "Email, name, and password are required"})
+    if len(pw) < 6:
+        return jsonify({"success": False, "error": "Password must be at least 6 characters"})
+    if role not in ('admin', 'agent', 'user'):
+        role = 'user'
+    users = get_users()
+    if email in users:
+        return jsonify({"success": False, "error": "Email already exists"})
+    users[email] = {
+        "password":            generate_password_hash(pw),
+        "role":                role,
+        "name":                name,
+        "theme":               "dark",
+        "email_notifications": True,
+        "reset_token":         None,
+        "reset_token_expiry":  None,
+        "availability_status": "online",
+        "skills":              data.get('skills', []),
+        "max_workload":        int(data.get('max_workload', 10))
+    }
+    save_users(users)
+    return jsonify({"success": True})
+
+@app.route('/api/admin/users/delete', methods=['POST'])
+def admin_delete_user():
+    if not is_admin(): return jsonify({"success": False, "error": "Unauthorized"})
+    data  = request.get_json()
+    email = data.get('email', '').strip()
+    if not email:
+        return jsonify({"success": False, "error": "Email required"})
+    if email == session.get('user'):
+        return jsonify({"success": False, "error": "Cannot delete your own account"})
+    users = get_users()
+    if email not in users:
+        return jsonify({"success": False, "error": "User not found"})
+    del users[email]
+    save_users(users)
+    return jsonify({"success": True})
+
+# ── Agent availability API ─────────────────────────────────────────────────────
+
+@app.route('/api/agent/availability', methods=['POST'])
+def set_agent_availability():
+    if 'user' not in session:   return jsonify({"success": False, "error": "Not logged in"})
+    if not is_admin_or_agent(): return jsonify({"success": False, "error": "Unauthorized"})
+    data   = request.get_json()
+    status = data.get('status', 'online')
+    if status not in ('online', 'away', 'busy'):
+        return jsonify({"success": False, "error": "Invalid status"})
+    users = get_users()
+    email = session['user']
+    users[email]['availability_status'] = status
+    save_users(users)
+    return jsonify({"success": True, "status": status})
+
+
+@app.route('/api/auto_assign/<ticket_id>', methods=['POST'])
+def auto_assign_ticket(ticket_id):
+    if not is_admin(): return jsonify({"success": False, "error": "Unauthorized"})
+    df   = get_safe_data()
+    mask = df['Ticket_ID'].astype(str).str.strip() == ticket_id.strip()
+    if not mask.any():
+        return jsonify({"success": False, "error": "Ticket not found"})
+    row      = df[mask].iloc[0]
+    category = str(row.get('Category', ''))
+    priority = str(row.get('Priority', 'Low'))
+    agent    = _find_best_agent(category, priority)
+    if not agent:
+        return jsonify({"success": False, "error": "No available agent found"})
+    u = current_user_info()
+    df.loc[mask, 'Assigned_To']  = agent
+    df.loc[mask, 'Status']       = 'In Progress'
+    df.loc[mask, 'Last_Updated'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+    df.to_excel(EXCEL_FILE, index=False)
+    log_ticket_event(ticket_id, u['email'], u['name'], 'assigned',
+                     f"Auto-assigned to {agent} (skill: {category})")
+    add_notification(agent,
+        f"Ticket {ticket_id} assigned to you: {category} ({priority})", ticket_id, 'new_ticket')
+    return jsonify({"success": True, "assigned_to": agent})
 
 # ── Classify API ───────────────────────────────────────────────────────────────
 
@@ -984,70 +1234,14 @@ def _classify_keywords(text):
         priority = 'Medium'
     return jsonify({"category": best_category, "priority": priority, "confidence": 0.7})
 
-def _classify_ai(text):
-    try:
-        import anthropic as anthropic_sdk
-        client     = anthropic_sdk.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
-        categories = list(CLASSIFY_RULES.keys()) + ['Other']
-        message    = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=256,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"You are an IT helpdesk classifier. Given this ticket, return JSON with:\n"
-                    f"- \"category\": one of {categories}\n"
-                    f"- \"priority\": one of Critical, High, Medium, Low\n"
-                    f"- \"confidence\": 0.0-1.0\n\n"
-                    f"Ticket: \"{text}\"\n\nReturn only valid JSON."
-                )
-            }]
-        )
-        result = json.loads(message.content[0].text)
-        return jsonify(result)
-    except Exception as e:
-        print(f"[AI classify error]: {e}")
-        return _classify_keywords(text)
-
 @app.route('/api/classify', methods=['POST'])
 def classify():
     if 'user' not in session: return jsonify({"error": "Not logged in"}), 401
-    data   = request.get_json()
-    text   = data.get('text', '').strip()
-    use_ai = data.get('use_ai', False)
+    data = request.get_json()
+    text = data.get('text', '').strip()
     if not text: return jsonify({"category": None, "priority": None})
-    if use_ai and os.environ.get('ANTHROPIC_API_KEY'):
-        return _classify_ai(text)
     return _classify_keywords(text)
 
-# ── SQL Console API ────────────────────────────────────────────────────────────
-
-@app.route('/api/sql', methods=['POST'])
-def run_sql():
-    if not is_admin(): return jsonify({"error": "Unauthorized"}), 403
-    data  = request.get_json()
-    query = data.get('query', '').strip()
-    if not re.match(r'^\s*SELECT\b', query, re.IGNORECASE):
-        return jsonify({"error": "Only SELECT queries are allowed."})
-
-    conn = sqlite3.connect(':memory:')
-    try:
-        df = get_safe_data()
-        df.to_sql('tickets', conn, if_exists='replace', index=False)
-        users      = get_users()
-        users_rows = [{"email": e, "name": u.get("name",""), "role": u.get("role","user")}
-                      for e, u in users.items()]
-        pd.DataFrame(users_rows).to_sql('users', conn, if_exists='replace', index=False)
-
-        cursor = conn.cursor()
-        cursor.execute(query)
-        columns = [d[0] for d in cursor.description] if cursor.description else []
-        rows    = [[str(v) if v is not None else '' for v in row] for row in cursor.fetchall()]
-        return jsonify({"columns": columns, "rows": rows, "count": len(rows)})
-    except Exception as e:
-        return jsonify({"error": str(e)})
-    finally:
-        conn.close()
 
 # ── SLA Alerts API ─────────────────────────────────────────────────────────────
 
@@ -1084,42 +1278,27 @@ def sla_alerts():
     alerts.sort(key=lambda x: x['sla_pct'], reverse=True)
     return jsonify(alerts[:20])
 
-# ── Agent Performance API ──────────────────────────────────────────────────────
-
-@app.route('/api/agent_perf')
-def agent_perf():
-    if not is_admin(): return jsonify([])
-    df = get_safe_data()
-    if df.empty or 'Assigned_To' not in df.columns: return jsonify([])
-
-    date_from = request.args.get('date_from')
-    date_to   = request.args.get('date_to')
-    if date_from or date_to:
-        df['Created_Date'] = pd.to_datetime(df['Created_Date'], errors='coerce')
-        if date_from: df = df[df['Created_Date'] >= pd.to_datetime(date_from)]
-        if date_to:   df = df[df['Created_Date'] <= pd.to_datetime(date_to)]
-
+def _build_agent_perf(df):
+    """Build agent performance summary — used by /api/stats."""
+    if df.empty or 'Assigned_To' not in df.columns:
+        return []
     results = []
     for agent, group in df.groupby('Assigned_To'):
-        total      = len(group)
-        resolved   = len(group[group['Status'].isin(['Resolved','Closed'])])
-        open_count = len(group[group['Status'] == 'Open'])
-        critical   = len(group[group['Priority'] == 'Critical'])
-        res_times  = group['Resolution_Time_Hours'].dropna() if 'Resolution_Time_Hours' in group else pd.Series([], dtype=float)
-        avg_res    = round(float(res_times.mean()), 1) if len(res_times) > 0 else 0
-        breaches   = sum(1 for _, r in group.iterrows()
-                         if get_sla_status(r.get('Priority'), r.get('Resolution_Time_Hours')) == 'breached')
+        total     = len(group)
+        resolved  = len(group[group['Status'].isin(['Resolved','Closed'])])
+        res_times = group['Resolution_Time_Hours'].dropna() if 'Resolution_Time_Hours' in group else pd.Series([], dtype=float)
+        avg_res   = round(float(res_times.mean()), 1) if len(res_times) > 0 else 0
+        breaches  = sum(1 for _, r in group.iterrows()
+                        if get_sla_status(r.get('Priority'), r.get('Resolution_Time_Hours')) == 'breached')
         results.append({
-            "agent":            str(agent),
-            "total":            total,
-            "resolved":         resolved,
-            "open":             open_count,
-            "critical":         critical,
-            "avg_res":          avg_res if not pd.isna(avg_res) else 0,
-            "resolution_rate":  round((resolved/total)*100, 1) if total > 0 else 0,
-            "sla_breaches":     breaches
+            "agent":           str(agent),
+            "total":           total,
+            "resolved":        resolved,
+            "avg_res":         avg_res if not pd.isna(avg_res) else 0,
+            "resolution_rate": round((resolved/total)*100, 1) if total > 0 else 0,
+            "sla_breaches":    breaches
         })
-    return jsonify(sorted(results, key=lambda x: x['total'], reverse=True))
+    return sorted(results, key=lambda x: x['total'], reverse=True)
 
 # ── Search autocomplete API ────────────────────────────────────────────────────
 
@@ -1146,6 +1325,326 @@ def search_autocomplete():
         "label": f"{r['Ticket_ID']} — {r['Category']} ({r['Status']})",
         "url":   f"/tickets/{r['Ticket_ID']}"
     } for _, r in results.iterrows()])
+
+# ── Accept / Decline with re-routing ──────────────────────────────────────────
+
+@app.route('/api/tickets/<ticket_id>/accept', methods=['POST'])
+def accept_ticket(ticket_id):
+    if 'user' not in session:   return jsonify({"success": False, "error": "Unauthorized"}), 401
+    if not is_admin_or_agent(): return jsonify({"success": False, "error": "Unauthorized"}), 403
+    u    = current_user_info()
+    df   = get_safe_data()
+    mask = df['Ticket_ID'].astype(str).str.strip() == ticket_id.strip()
+    if not mask.any():
+        return jsonify({"success": False, "error": "Ticket not found"})
+    row = df[mask].iloc[0]
+    if str(row.get('Assigned_To', '')) not in (u['email'], u['name']) and u['role'] != 'admin':
+        return jsonify({"success": False, "error": "Not assigned to you"})
+    df.loc[mask, 'Status']       = 'In Progress'
+    df.loc[mask, 'Last_Updated'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+    df.to_excel(EXCEL_FILE, index=False)
+    log_ticket_event(ticket_id, u['email'], u['name'], 'updated', f"Ticket accepted by {u['name']}")
+    owner = str(row.get('Created_By', ''))
+    if owner and owner != u['email']:
+        add_notification(owner, f"{u['name']} accepted ticket {ticket_id}", ticket_id, 'update')
+    return jsonify({"success": True})
+
+
+@app.route('/api/tickets/<ticket_id>/decline', methods=['POST'])
+def decline_ticket(ticket_id):
+    if 'user' not in session:   return jsonify({"success": False, "error": "Unauthorized"}), 401
+    if not is_admin_or_agent(): return jsonify({"success": False, "error": "Unauthorized"}), 403
+    u      = current_user_info()
+    reason = (request.get_json() or {}).get('reason', '').strip() or 'No reason given'
+    df     = get_safe_data()
+    mask   = df['Ticket_ID'].astype(str).str.strip() == ticket_id.strip()
+    if not mask.any():
+        return jsonify({"success": False, "error": "Ticket not found"})
+    row      = df[mask].iloc[0]
+    if str(row.get('Assigned_To', '')) not in (u['email'], u['name']) and u['role'] != 'admin':
+        return jsonify({"success": False, "error": "Not assigned to you"})
+    category = str(row.get('Category', ''))
+    priority = str(row.get('Priority', 'Low'))
+
+    # Re-route: find next best agent excluding the declining agent
+    users = get_users()
+    available = [
+        (email, usr) for email, usr in users.items()
+        if usr.get('role') == 'agent'
+        and usr.get('availability_status', 'online') == 'online'
+        and email != u['email']
+    ]
+    candidates = []
+    for email, usr in available:
+        workload  = _get_agent_workload(email)
+        max_wl    = usr.get('max_workload', 10)
+        if workload >= max_wl: continue
+        has_skill = category in usr.get('skills', [])
+        candidates.append((email, workload, has_skill))
+    candidates.sort(key=lambda x: (not x[2], x[1]))
+    new_agent = candidates[0][0] if candidates else 'Unassigned'
+
+    df.loc[mask, 'Assigned_To']  = new_agent
+    df.loc[mask, 'Status']       = 'Open' if new_agent == 'Unassigned' else 'In Progress'
+    df.loc[mask, 'Last_Updated'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+    df.to_excel(EXCEL_FILE, index=False)
+
+    log_ticket_event(ticket_id, u['email'], u['name'], 'assigned',
+                     f"Declined by {u['name']} ({reason}). Re-routed to {new_agent}")
+    if new_agent != 'Unassigned':
+        add_notification(new_agent,
+            f"Ticket {ticket_id} re-assigned to you: {category} ({priority})", ticket_id, 'new_ticket')
+    return jsonify({"success": True, "re_assigned_to": new_agent})
+
+
+# ── Canned responses (quick reply templates) ───────────────────────────────────
+
+def _get_canned():
+    data = _read_json(CANNED_FILE, None)
+    if data is None:
+        _write_json(CANNED_FILE, DEFAULT_CANNED)
+        return DEFAULT_CANNED
+    return data
+
+@app.route('/api/canned_responses', methods=['GET'])
+def get_canned_responses():
+    if not is_admin_or_agent(): return jsonify([])
+    return jsonify(_get_canned())
+
+@app.route('/api/canned_responses', methods=['POST'])
+def add_canned_response():
+    if not is_admin(): return jsonify({"success": False, "error": "Admins only"}), 403
+    body  = request.get_json() or {}
+    label = body.get('label', '').strip()
+    text  = body.get('body', '').strip()
+    if not label or not text:
+        return jsonify({"success": False, "error": "label and body required"})
+    items = _get_canned()
+    new   = {"id": str(uuid.uuid4())[:8], "label": label, "body": text}
+    items.append(new)
+    _write_json(CANNED_FILE, items)
+    return jsonify({"success": True, "item": new})
+
+@app.route('/api/canned_responses/<cid>', methods=['DELETE'])
+def delete_canned_response(cid):
+    if not is_admin(): return jsonify({"success": False, "error": "Admins only"}), 403
+    items = [r for r in _get_canned() if r.get('id') != cid]
+    _write_json(CANNED_FILE, items)
+    return jsonify({"success": True})
+
+
+# ── Ticket transfer ────────────────────────────────────────────────────────────
+
+@app.route('/api/tickets/<ticket_id>/transfer', methods=['POST'])
+def transfer_ticket(ticket_id):
+    if 'user' not in session:   return jsonify({"success": False, "error": "Unauthorized"}), 401
+    if not is_admin_or_agent(): return jsonify({"success": False, "error": "Unauthorized"}), 403
+    u        = current_user_info()
+    body     = request.get_json() or {}
+    to_agent = body.get('to_agent', '').strip()
+    reason   = body.get('reason', '').strip() or 'No reason given'
+    if not to_agent:
+        return jsonify({"success": False, "error": "to_agent required"})
+    users = get_users()
+    if to_agent not in users:
+        return jsonify({"success": False, "error": "Agent not found"})
+    df   = get_safe_data()
+    mask = df['Ticket_ID'].astype(str).str.strip() == ticket_id.strip()
+    if not mask.any():
+        return jsonify({"success": False, "error": "Ticket not found"})
+    row = df[mask].iloc[0]
+    if u['role'] == 'agent' and str(row.get('Assigned_To', '')) not in (u['email'], u['name']):
+        return jsonify({"success": False, "error": "Not your ticket"})
+    old_agent = str(row.get('Assigned_To', 'Unassigned'))
+    df.loc[mask, 'Assigned_To']  = to_agent
+    df.loc[mask, 'Status']       = 'In Progress'
+    df.loc[mask, 'Last_Updated'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+    df.to_excel(EXCEL_FILE, index=False)
+    log_ticket_event(ticket_id, u['email'], u['name'], 'assigned',
+                     f"Transferred from {old_agent} to {to_agent}. Reason: {reason}")
+    add_notification(to_agent,
+        f"Ticket {ticket_id} transferred to you by {u['name']}", ticket_id, 'new_ticket')
+    return jsonify({"success": True, "assigned_to": to_agent})
+
+
+# ── Agent personal stats ──────────────────────────────────────────────────────
+
+@app.route('/api/agent/stats')
+def agent_stats():
+    if not is_admin_or_agent(): return jsonify({}), 403
+    u   = current_user_info()
+    df  = get_safe_data()
+    now = datetime.now()
+
+    if df.empty:
+        return jsonify({
+            "resolved_today": 0, "resolved_week": 0, "avg_resolution": 0,
+            "sla_compliance": 100, "queue_open": 0, "queue_inprogress": 0,
+            "queue_near_breach": 0, "queue_breached": 0,
+            "total_assigned": 0, "total_resolved": 0,
+            "trend": {"labels": [], "values": []}
+        })
+
+    mask  = (df['Assigned_To'].astype(str).str.strip() == u['email']) | \
+            (df['Assigned_To'].astype(str).str.strip() == u['name'])
+    my_df = df[mask].copy()
+
+    today      = now.date()
+    week_start = today - timedelta(days=today.weekday())
+
+    resolved = my_df[my_df['Status'].isin(['Resolved', 'Closed'])].copy()
+    resolved_today = 0
+    resolved_week  = 0
+    if 'Last_Updated' in resolved.columns and len(resolved):
+        resolved['_upd'] = pd.to_datetime(resolved['Last_Updated'], errors='coerce')
+        resolved_today   = int((resolved['_upd'].dt.date == today).sum())
+        resolved_week    = int((resolved['_upd'].dt.date >= week_start).sum())
+
+    avg_res = 0
+    if 'Resolution_Time_Hours' in resolved.columns and len(resolved):
+        vals    = pd.to_numeric(resolved['Resolution_Time_Hours'], errors='coerce').dropna()
+        avg_res = round(float(vals.mean()), 1) if len(vals) else 0
+
+    total_resolved = len(resolved)
+    sla_ok = sum(
+        1 for _, row in resolved.iterrows()
+        if get_sla_status(row.get('Priority', 'Low'), row.get('Resolution_Time_Hours', 0)) != 'breached'
+    )
+    sla_pct = round(sla_ok / total_resolved * 100, 1) if total_resolved else 100.0
+
+    active       = my_df[~my_df['Status'].isin(['Resolved', 'Closed'])]
+    queue_open   = int((active['Status'] == 'Open').sum())
+    queue_inprog = int((active['Status'] == 'In Progress').sum())
+    near_breach  = 0
+    sla_breached = 0
+    for _, row in active.iterrows():
+        created  = row.get('Created_Date')
+        sla_hrs  = SLA_HOURS.get(str(row.get('Priority', 'Low')), 24)
+        if pd.notna(created):
+            try:
+                elapsed = (now - pd.to_datetime(created)).total_seconds() / 3600
+                pct     = (elapsed / sla_hrs) * 100
+                if pct >= 100: sla_breached += 1
+                elif pct >= 75: near_breach  += 1
+            except Exception:
+                pass
+
+    # 7-day ticket trend
+    trend_labels, trend_values = [], []
+    if 'Created_Date' in my_df.columns:
+        my_df['_date'] = pd.to_datetime(my_df['Created_Date'], errors='coerce').dt.date
+        for i in range(6, -1, -1):
+            d = (now - timedelta(days=i)).date()
+            trend_labels.append(d.strftime('%a'))
+            trend_values.append(int((my_df['_date'] == d).sum()))
+
+    return jsonify({
+        "resolved_today":    resolved_today,
+        "resolved_week":     resolved_week,
+        "avg_resolution":    avg_res,
+        "sla_compliance":    sla_pct,
+        "queue_open":        queue_open,
+        "queue_inprogress":  queue_inprog,
+        "queue_near_breach": near_breach,
+        "queue_breached":    sla_breached,
+        "total_assigned":    len(my_df),
+        "total_resolved":    total_resolved,
+        "trend":             {"labels": trend_labels, "values": trend_values}
+    })
+
+
+# ── Agent-to-agent chat ────────────────────────────────────────────────────────
+
+@app.route('/api/chat/messages', methods=['GET'])
+def get_chat_messages():
+    if not is_admin_or_agent(): return jsonify([])
+    u     = current_user_info()
+    room  = request.args.get('room', 'general')
+    since = request.args.get('since', '')
+    msgs  = _read_json(CHAT_FILE, [])
+
+    if room == 'general':
+        visible = [m for m in msgs if m.get('to') == 'all']
+    else:
+        visible = [m for m in msgs if
+                   (m.get('from_email') == u['email'] and m.get('to') == room) or
+                   (m.get('from_email') == room       and m.get('to') == u['email'])]
+
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since)
+            visible  = [m for m in visible if datetime.fromisoformat(m['timestamp']) > since_dt]
+        except Exception:
+            pass
+
+    # Mark visible messages as read
+    changed = False
+    ids_visible = {m['id'] for m in visible}
+    for m in msgs:
+        if m['id'] in ids_visible and u['email'] not in m.get('read_by', []):
+            m.setdefault('read_by', []).append(u['email'])
+            changed = True
+    if changed:
+        _write_json(CHAT_FILE, msgs)
+
+    return jsonify(visible[-100:])
+
+
+@app.route('/api/chat/messages', methods=['POST'])
+def post_chat_message():
+    if not is_admin_or_agent(): return jsonify({"success": False}), 403
+    u    = current_user_info()
+    data = request.get_json() or {}
+    to   = data.get('to', 'all').strip()
+    body = data.get('body', '').strip()
+    if not body:
+        return jsonify({"success": False, "error": "Empty message"})
+    msg  = {
+        "id":         str(uuid.uuid4())[:8],
+        "from_email": u['email'],
+        "from_name":  u['name'],
+        "to":         to,
+        "body":       body,
+        "timestamp":  datetime.now().isoformat(),
+        "read_by":    [u['email']]
+    }
+    msgs = _read_json(CHAT_FILE, [])
+    msgs.append(msg)
+    if len(msgs) > 1000:
+        msgs = msgs[-1000:]
+    _write_json(CHAT_FILE, msgs)
+    return jsonify({"success": True, "message": msg})
+
+
+@app.route('/api/chat/unread')
+def chat_unread():
+    if not is_admin_or_agent(): return jsonify({"count": 0})
+    u    = current_user_info()
+    msgs = _read_json(CHAT_FILE, [])
+    count = sum(
+        1 for m in msgs
+        if u['email'] not in m.get('read_by', [])
+        and m.get('from_email') != u['email']
+        and (m.get('to') == 'all' or m.get('to') == u['email'])
+    )
+    return jsonify({"count": count})
+
+
+# ── Agent list for transfer modal ──────────────────────────────────────────────
+
+@app.route('/api/agents')
+def list_agents():
+    if not is_admin_or_agent(): return jsonify([])
+    users = get_users()
+    u     = current_user_info()
+    return jsonify([
+        {"email": email, "name": usr.get("name", email),
+         "availability": usr.get("availability_status", "online"),
+         "workload": _get_agent_workload(email)}
+        for email, usr in users.items()
+        if usr.get('role') in ('agent', 'admin') and email != u['email']
+    ])
+
 
 if __name__ == '__main__':
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)

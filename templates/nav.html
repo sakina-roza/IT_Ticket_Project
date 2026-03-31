@@ -1,14 +1,14 @@
 <nav class="flex justify-between items-center mb-10 border-b border-white/5 pb-4">
     <div class="flex gap-6 items-center">
         {% if is_admin_user %}
-            <a href="/dashboard" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'dashboard' else 'text-zinc-500 hover:text-white transition-colors' }}">DASHBOARD</a>
-            <a href="/tickets"   class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'tickets'   else 'text-zinc-500 hover:text-white transition-colors' }}">TICKETS</a>
-            <a href="/manage"    class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'manage'    else 'text-zinc-500 hover:text-white transition-colors' }}">MANAGE</a>
-            <a href="/analytics" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'analytics' else 'text-zinc-500 hover:text-white transition-colors' }}">ANALYTICS</a>
-            <a href="/sql"       class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'sql'       else 'text-zinc-500 hover:text-white transition-colors' }}">SQL QUERY</a>
+            <a href="/dashboard"    class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'dashboard'    else 'text-zinc-500 hover:text-white transition-colors' }}">DASHBOARD</a>
+            <a href="/tickets"      class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'tickets'      else 'text-zinc-500 hover:text-white transition-colors' }}">TICKETS</a>
+            <a href="/manage"       class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'manage'       else 'text-zinc-500 hover:text-white transition-colors' }}">MANAGE</a>
+            <a href="/manage_users" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'manage_users' else 'text-zinc-500 hover:text-white transition-colors' }}">USERS</a>
         {% elif is_agent_user %}
-            <a href="/agent/queue" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'agent_queue' else 'text-zinc-500 hover:text-white transition-colors' }}">MY QUEUE</a>
-            <a href="/tickets"     class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'tickets'     else 'text-zinc-500 hover:text-white transition-colors' }}">ALL TICKETS</a>
+            <a href="/agent/dashboard" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'agent_dashboard' else 'text-zinc-500 hover:text-white transition-colors' }}">MY STATS</a>
+            <a href="/agent/queue"     class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'agent_queue'     else 'text-zinc-500 hover:text-white transition-colors' }}">MY QUEUE</a>
+            <a href="/tickets"         class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'tickets'         else 'text-zinc-500 hover:text-white transition-colors' }}">ALL TICKETS</a>
         {% else %}
             <a href="/my_tickets"    class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'my_tickets'    else 'text-zinc-500 hover:text-white transition-colors' }}">MY TICKETS</a>
             <a href="/create_ticket" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'create_ticket' else 'text-zinc-500 hover:text-white transition-colors' }}">CREATE TICKET</a>
@@ -42,6 +42,16 @@
                 </div>
                 <div id="notif-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
             </div>
+        </div>
+        {% endif %}
+
+        <!-- Chat icon (agent/admin only) -->
+        {% if current_user and current_user.role in ('admin','agent') %}
+        <div class="relative">
+            <button onclick="toggleChat()" class="text-zinc-400 hover:text-white text-xl relative">
+                💬
+                <span id="chat-badge" class="hidden absolute -top-1 -right-1 bg-blue-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">0</span>
+            </button>
         </div>
         {% endif %}
 
@@ -160,4 +170,181 @@
             }
         }).catch(()=>{});
     })();
+
+    // ── Chat ──────────────────────────────────────────────────────────────────
+    let chatOpen      = false;
+    let chatRoom      = 'general';   // 'general' or an agent email
+    let chatPollTimer = null;
+    let lastMsgTime   = null;
+
+    function toggleChat() {
+        chatOpen = !chatOpen;
+        const panel = document.getElementById('chat-panel');
+        if (!panel) return;
+        panel.style.display = chatOpen ? 'flex' : 'none';
+        if (chatOpen) {
+            loadChatAgents();
+            loadChatMessages();
+            startChatPoll();
+        } else {
+            stopChatPoll();
+        }
+    }
+
+    function startChatPoll() {
+        if (chatPollTimer) return;
+        chatPollTimer = setInterval(loadChatMessages, 4000);
+    }
+    function stopChatPoll() {
+        clearInterval(chatPollTimer);
+        chatPollTimer = null;
+    }
+
+    function escapeChat(str) {
+        if (!str) return '';
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    async function loadChatAgents() {
+        try {
+            const res    = await fetch('/api/agents');
+            const agents = await res.json();
+            const list   = document.getElementById('chat-agent-list');
+            if (!list) return;
+            const avail  = { online: '🟢', away: '🟡', busy: '🔴' };
+            list.innerHTML = `
+                <button onclick="switchChatRoom('general')" id="chat-room-general"
+                        class="chat-room-btn w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase bg-white/5 text-red-400 mb-1">
+                    🌐 Team Chat
+                </button>
+                ${agents.map(a => `
+                    <button onclick="switchChatRoom('${a.email}')" id="chat-room-${CSS.escape(a.email)}"
+                            class="chat-room-btn w-full text-left px-3 py-2 rounded-xl text-[10px] hover:bg-white/5 transition-colors text-zinc-400 flex items-center gap-2">
+                        <span>${avail[a.availability] || '⚪'}</span>
+                        <span class="truncate">${escapeChat(a.name)}</span>
+                    </button>
+                `).join('')}
+            `;
+        } catch(e) {}
+    }
+
+    function switchChatRoom(room) {
+        chatRoom    = room;
+        lastMsgTime = null;
+        document.querySelectorAll('.chat-room-btn').forEach(b => {
+            b.classList.remove('bg-white/5','text-red-400');
+            b.classList.add('text-zinc-400');
+        });
+        const active = document.getElementById(`chat-room-${CSS.escape(room === 'general' ? 'general' : room)}`);
+        if (active) {
+            active.classList.add('bg-white/5','text-red-400');
+            active.classList.remove('text-zinc-400');
+        }
+        document.getElementById('chat-messages').innerHTML = '';
+        loadChatMessages();
+    }
+
+    async function loadChatMessages() {
+        try {
+            let url = `/api/chat/messages?room=${encodeURIComponent(chatRoom)}`;
+            if (lastMsgTime) url += `&since=${encodeURIComponent(lastMsgTime)}`;
+            const res  = await fetch(url);
+            const msgs = await res.json();
+            if (!msgs.length) return;
+
+            const box       = document.getElementById('chat-messages');
+            const atBottom  = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+            const currentEmail = document.getElementById('chat-current-email')?.value || '';
+            msgs.forEach(m => {
+                if (document.getElementById('cmsg-' + m.id)) return;
+                const isMine = m.from_email === currentEmail;
+                const time   = new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+                const div    = document.createElement('div');
+                div.id       = 'cmsg-' + m.id;
+                div.className= `flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`;
+                div.innerHTML= `
+                    <div class="max-w-[75%] ${isMine ? 'bg-red-600/20 border border-red-600/30' : 'bg-zinc-800'} rounded-2xl px-4 py-2">
+                        ${!isMine ? `<p class="text-[9px] font-bold text-red-400 uppercase mb-1">${escapeChat(m.from_name)}</p>` : ''}
+                        <p class="text-xs text-zinc-200 leading-relaxed">${escapeChat(m.body)}</p>
+                        <p class="text-[8px] text-zinc-600 mt-1 ${isMine ? 'text-right' : ''}">${time}</p>
+                    </div>`;
+                box.appendChild(div);
+                lastMsgTime = m.timestamp;
+            });
+            if (atBottom) box.scrollTop = box.scrollHeight;
+        } catch(e) {}
+    }
+
+    async function sendChatMessage() {
+        const input = document.getElementById('chat-input');
+        if (!input) return;
+        const body  = input.value.trim();
+        if (!body)  return;
+        input.value = '';
+        try {
+            await fetch('/api/chat/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ to: chatRoom === 'general' ? 'all' : chatRoom, body })
+            });
+            lastMsgTime = null;
+            loadChatMessages();
+        } catch(e) {}
+    }
+
+    // Chat Enter key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey && document.activeElement?.id === 'chat-input') {
+            e.preventDefault();
+            sendChatMessage();
+        }
+    });
+
+    // Chat unread badge
+    (function pollChatUnread() {
+        fetch('/api/chat/unread').then(r=>r.json()).then(d => {
+            const badge = document.getElementById('chat-badge');
+            if (!badge) return;
+            if (d.count > 0) {
+                badge.textContent = d.count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }).catch(()=>{});
+        setTimeout(pollChatUnread, 15000);
+    })();
 </script>
+
+<!-- CHAT PANEL (fixed bottom-right) -->
+{% if current_user and current_user.role in ('admin','agent') %}
+<input type="hidden" id="chat-current-email" value="{{ current_user.email if current_user else '' }}">
+<div id="chat-panel" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;width:400px;height:520px;z-index:200;background:#0d0d0d;"
+     class="flex flex-col rounded-[1.5rem] overflow-hidden border border-white/10 shadow-2xl">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-3 border-b border-white/5" style="background:#111;">
+        <p class="text-xs font-black uppercase tracking-widest text-red-500">💬 Team Chat</p>
+        <button onclick="toggleChat()" class="text-zinc-600 hover:text-white text-lg leading-none transition-colors">✕</button>
+    </div>
+
+    <!-- Body: sidebar + messages -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Agent list sidebar -->
+        <div id="chat-agent-list" class="w-32 border-r border-white/5 p-2 overflow-y-auto text-[10px] space-y-0.5" style="background:#0a0a0a;">
+            <p class="text-zinc-700 text-[9px] uppercase px-2 py-1">Loading...</p>
+        </div>
+
+        <!-- Messages area -->
+        <div class="flex-1 flex flex-col" style="background:#0d0d0d;">
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-1"></div>
+            <div class="flex gap-2 p-3 border-t border-white/5">
+                <input id="chat-input" type="text" placeholder="Message..."
+                       class="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-600/50 transition-colors">
+                <button onclick="sendChatMessage()"
+                        class="bg-red-600 hover:bg-red-700 px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all active:scale-95">↑</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

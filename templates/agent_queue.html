@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Queue — IT Helpdesk</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #050505; color: white; font-family: sans-serif; }
@@ -26,7 +28,27 @@
             <h1 class="text-4xl font-black italic uppercase">MY <span class="text-red-600">QUEUE</span></h1>
             <p class="text-xs text-zinc-500 mt-1 uppercase tracking-widest">Tickets assigned to you — {{ current_user.name if current_user else '' }}</p>
         </div>
-        <button onclick="loadQueue()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-all">↺ Refresh</button>
+        <!-- Availability Status Toggle -->
+        <div class="flex items-center gap-3">
+            <div class="glass rounded-2xl px-4 py-2 flex items-center gap-3">
+                <span class="text-[10px] text-zinc-500 uppercase tracking-widest">Status</span>
+                <div class="flex gap-1.5">
+                    <button type="button" id="avail-online" onclick="setAvailability('online')"
+                            class="avail-btn px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all border border-green-800/40 bg-green-900/20 text-green-400 hover:bg-green-900/40">
+                        🟢 Online
+                    </button>
+                    <button type="button" id="avail-away" onclick="setAvailability('away')"
+                            class="avail-btn px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all border border-zinc-800 text-zinc-600 hover:border-yellow-700 hover:text-yellow-400">
+                        🟡 Away
+                    </button>
+                    <button type="button" id="avail-busy" onclick="setAvailability('busy')"
+                            class="avail-btn px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all border border-zinc-800 text-zinc-600 hover:border-red-800 hover:text-red-400">
+                        🔴 Busy
+                    </button>
+                </div>
+            </div>
+            <button type="button" onclick="loadQueue()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-all">↺ Refresh</button>
+        </div>
     </div>
 
     <!-- STATS -->
@@ -75,8 +97,87 @@
 
 <script>
     const SLA_COLOR = { on_track: 'text-green-400', near_breach: 'text-yellow-400', breached: 'text-red-400', unknown: 'text-zinc-600' };
-    const SLA_LABEL = { on_track: '🟢 OK', near_breach: '🟡 Near', breached: '🔴 Breach', unknown: '⚪ N/A' };
     const PRI_COLOR = { Critical: 'text-red-400', High: 'text-orange-400', Medium: 'text-yellow-400', Low: 'text-zinc-400' };
+
+    // Live countdown state: ticketId → remaining seconds at last load
+    const slaTimers = {};  // ticketId → { remaining, loadedAt }
+
+    function fmtCountdown(seconds) {
+        if (seconds === null || seconds === undefined) return '<span class="text-zinc-600">⚪ N/A</span>';
+        const abs = Math.abs(Math.round(seconds));
+        const h   = Math.floor(abs / 3600);
+        const m   = Math.floor((abs % 3600) / 60);
+        const s   = abs % 60;
+        const hms = `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+        if (seconds < 0)         return `<span class="text-red-400 font-mono text-[10px]">🔴 +${hms} over</span>`;
+        if (seconds < 3600)      return `<span class="text-red-400 font-mono text-[10px] animate-pulse">⚠️ ${hms}</span>`;
+        if (seconds < 3600 * 4)  return `<span class="text-yellow-400 font-mono text-[10px]">🟡 ${hms}</span>`;
+        return `<span class="text-green-400 font-mono text-[10px]">🟢 ${hms}</span>`;
+    }
+
+    function tickCountdowns() {
+        const now = Date.now();
+        document.querySelectorAll('[data-sla-timer]').forEach(el => {
+            const tid        = el.dataset.slaTid;
+            const t          = slaTimers[tid];
+            if (!t) return;
+            const elapsed    = (now - t.loadedAt) / 1000;
+            const current    = t.remaining - elapsed;
+            el.innerHTML     = fmtCountdown(current);
+        });
+    }
+
+    // ── Availability toggle ────────────────────────────────────────────────────
+    let currentAvailability = 'online';
+
+    function updateAvailabilityUI(status) {
+        currentAvailability = status;
+        const styles = {
+            online: 'border-green-800/40 bg-green-900/20 text-green-400',
+            away:   'border-yellow-800/40 bg-yellow-900/20 text-yellow-400',
+            busy:   'border-red-800/40 bg-red-900/20 text-red-400'
+        };
+        const inactive = 'border-zinc-800 bg-transparent text-zinc-600';
+        ['online','away','busy'].forEach(s => {
+            const btn = document.getElementById('avail-' + s);
+            if (!btn) return;
+            btn.className = `avail-btn px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all border ${s === status ? styles[s] : inactive}`;
+        });
+    }
+
+    async function setAvailability(status) {
+        try {
+            const res  = await fetch('/api/agent/availability', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            const data = await res.json();
+            if (data.success) {
+                updateAvailabilityUI(status);
+                showToast(`Status set to ${status}`, 'success');
+            } else {
+                showToast(data.error || 'Failed to update status', 'error');
+            }
+        } catch(e) { showToast('Network error', 'error'); }
+    }
+
+    async function loadCurrentAvailability() {
+        try {
+            const res   = await fetch('/api/admin/users');
+            // Only works if admin; for agents, we piggyback on the user list or store in localStorage
+        } catch(e) {}
+        // Restore from localStorage as fallback
+        const saved = localStorage.getItem('agent_availability') || 'online';
+        updateAvailabilityUI(saved);
+    }
+
+    // Intercept setAvailability to also persist locally
+    const _origSet = setAvailability;
+    async function setAvailability(status) {
+        localStorage.setItem('agent_availability', status);
+        await _origSet(status);
+    }
 
     function showToast(msg, type='success') {
         const t = document.getElementById('toast');
@@ -119,10 +220,20 @@
             }
             empty.classList.add('hidden');
 
+            // Register SLA timer state
+            const loadedAt = Date.now();
+            data.forEach(t => {
+                if (t.SLA_Remaining_Seconds !== null && t.SLA_Remaining_Seconds !== undefined) {
+                    slaTimers[t.Ticket_ID] = { remaining: t.SLA_Remaining_Seconds, loadedAt };
+                }
+            });
+
             tbody.innerHTML = data.map(t => {
-                const slaClass = SLA_COLOR[t.SLA_Status] || 'text-zinc-600';
-                const slaLabel = SLA_LABEL[t.SLA_Status] || '⚪ N/A';
-                const priClass = PRI_COLOR[t.Priority]   || 'text-white';
+                const priClass = PRI_COLOR[t.Priority] || 'text-white';
+                const hasTimer = t.SLA_Remaining_Seconds !== null && t.SLA_Remaining_Seconds !== undefined;
+                const slaCell  = hasTimer
+                    ? `<span data-sla-timer data-sla-tid="${t.Ticket_ID}">${fmtCountdown(t.SLA_Remaining_Seconds)}</span>`
+                    : `<span class="text-zinc-600 text-[10px]">⚪ N/A</span>`;
                 return `
                     <tr class="border-b border-white/5 hover:bg-white/5 transition">
                         <td class="p-4"><a href="/tickets/${t.Ticket_ID}" class="font-mono font-bold text-xs hover:text-red-500 transition-colors">${t.Ticket_ID || '--'}</a></td>
@@ -130,10 +241,14 @@
                         <td class="p-4 text-xs font-bold ${priClass}">${t.Priority || '--'}</td>
                         <td class="p-4 text-xs">${t.Status || '--'}</td>
                         <td class="p-4 text-zinc-500 text-xs">${String(t.Created_Date || '').substring(0,10) || '--'}</td>
-                        <td class="p-4 text-xs font-bold ${slaClass}">${slaLabel}</td>
+                        <td class="p-4">${slaCell}</td>
                         <td class="p-4 text-right">
-                            <div class="flex gap-2 justify-end">
-                                ${t.Status !== 'In Progress' ? `<button onclick="updateStatus('${t.Ticket_ID}','In Progress')" class="text-[9px] bg-blue-900/30 hover:bg-blue-900/60 border border-blue-600/20 px-3 py-1.5 rounded-lg font-bold uppercase transition-all">In Progress</button>` : ''}
+                            <div class="flex gap-2 justify-end flex-wrap">
+                                ${t.Status === 'Open' ? `
+                                    <button onclick="acceptTicket('${t.Ticket_ID}')" class="text-[9px] bg-green-900/30 hover:bg-green-900/60 border border-green-600/30 px-3 py-1.5 rounded-lg font-bold uppercase text-green-400 transition-all">✔ Accept</button>
+                                    <button onclick="openQueueDecline('${t.Ticket_ID}')" class="text-[9px] bg-red-900/20 hover:bg-red-900/40 border border-red-600/20 px-3 py-1.5 rounded-lg font-bold uppercase text-red-400 transition-all">✖ Decline</button>
+                                ` : ''}
+                                ${t.Status === 'In Progress' ? '' : t.Status !== 'Open' ? `<button onclick="updateStatus('${t.Ticket_ID}','In Progress')" class="text-[9px] bg-blue-900/30 hover:bg-blue-900/60 border border-blue-600/20 px-3 py-1.5 rounded-lg font-bold uppercase transition-all">In Progress</button>` : ''}
                                 ${!['Resolved','Closed'].includes(t.Status) ? `<button onclick="updateStatus('${t.Ticket_ID}','Resolved')" class="text-[9px] bg-green-900/30 hover:bg-green-900/60 border border-green-600/20 px-3 py-1.5 rounded-lg font-bold uppercase text-green-400 transition-all">Resolve</button>` : ''}
                                 <a href="/tickets/${t.Ticket_ID}" class="text-[9px] bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg font-bold uppercase transition-all">View</a>
                             </div>
@@ -144,8 +259,57 @@
         } catch(e) { console.error(e); }
     }
 
+    // ── Accept / Decline from queue ───────────────────────────────────────────
+    async function acceptTicket(ticketId) {
+        const res  = await fetch(`/api/tickets/${ticketId}/accept`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) { showToast(`${ticketId} accepted`, 'success'); loadQueue(); }
+        else showToast(data.error || 'Failed', 'error');
+    }
+
+    let _declineTid = null;
+    function openQueueDecline(ticketId) {
+        _declineTid = ticketId;
+        document.getElementById('q-decline-reason').value = '';
+        document.getElementById('q-decline-modal').classList.remove('hidden');
+    }
+    function closeQueueDecline() {
+        document.getElementById('q-decline-modal').classList.add('hidden');
+        _declineTid = null;
+    }
+    async function confirmQueueDecline() {
+        if (!_declineTid) return;
+        const reason = document.getElementById('q-decline-reason').value.trim();
+        const res    = await fetch(`/api/tickets/${_declineTid}/decline`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeQueueDecline();
+            showToast(`Declined — re-routed to ${data.re_assigned_to || 'Unassigned'}`, 'success');
+            loadQueue();
+        } else showToast(data.error || 'Failed', 'error');
+    }
+
     loadQueue();
+    loadCurrentAvailability();
     setInterval(loadQueue, 30000);
+    setInterval(tickCountdowns, 1000);
 </script>
+
+<!-- DECLINE MODAL (queue) -->
+<div id="q-decline-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="glass rounded-[2rem] p-8 w-full max-w-md space-y-5">
+        <h3 class="text-sm font-black uppercase tracking-widest text-red-400">Decline &amp; Re-route</h3>
+        <p class="text-[10px] text-zinc-500 uppercase">This ticket will be re-assigned to the next available agent.</p>
+        <textarea id="q-decline-reason" class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm outline-none focus:border-red-600/40 min-h-[80px]" placeholder="Reason for declining (optional)..."></textarea>
+        <div class="flex gap-3 justify-end">
+            <button onclick="closeQueueDecline()" class="text-[10px] font-bold uppercase text-zinc-600 hover:text-white transition-colors px-4 py-2">Cancel</button>
+            <button onclick="confirmQueueDecline()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95">Confirm Decline</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>

@@ -1,0 +1,25 @@
+[
+  {
+    "id": "b10ffefc",
+    "from_email": "admin@it.com",
+    "from_name": "Admin",
+    "to": "all",
+    "body": "hii",
+    "timestamp": "2026-03-31T15:22:15.942032",
+    "read_by": [
+      "admin@it.com",
+      "Agent_A@gmail.com"
+    ]
+  },
+  {
+    "id": "55730708",
+    "from_email": "Agent_A@gmail.com",
+    "from_name": "agent_A",
+    "to": "all",
+    "body": "hlw",
+    "timestamp": "2026-03-31T15:41:58.998610",
+    "read_by": [
+      "Agent_A@gmail.com"
+    ]
+  }
+]

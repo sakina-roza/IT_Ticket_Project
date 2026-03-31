@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Dashboard — IT Helpdesk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body { background: #050505; color: white; font-family: sans-serif; }
+        .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); }
+        .kpi-card { transition: transform 0.2s; }
+        .kpi-card:hover { transform: translateY(-2px); }
+        body.light-mode { background: #f4f4f5; color: #18181b; }
+        body.light-mode .glass { background: rgba(0,0,0,0.04); border-color: rgba(220,38,38,0.3); }
+    </style>
+</head>
+<body class="p-6">
+<div class="max-w-7xl mx-auto">
+    {% set active = 'agent_dashboard' %}
+    {% include 'nav.html' %}
+
+    <div class="flex justify-between items-end mb-8">
+        <div>
+            <h1 class="text-4xl font-black italic uppercase">MY <span class="text-red-600">DASHBOARD</span></h1>
+            <p class="text-[10px] text-zinc-500 mt-1 uppercase tracking-widest">Personal performance — {{ current_user.name if current_user else '' }}</p>
+        </div>
+        <button onclick="loadStats()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-all">↺ Refresh</button>
+    </div>
+
+    <!-- KPI CARDS -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="glass kpi-card p-6 rounded-3xl text-center">
+            <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Resolved Today</p>
+            <h2 id="kpi-today" class="text-4xl font-bold mt-2 text-green-400">--</h2>
+        </div>
+        <div class="glass kpi-card p-6 rounded-3xl text-center">
+            <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Resolved This Week</p>
+            <h2 id="kpi-week" class="text-4xl font-bold mt-2">--</h2>
+        </div>
+        <div class="glass kpi-card p-6 rounded-3xl text-center">
+            <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Avg Resolution</p>
+            <h2 id="kpi-avg" class="text-4xl font-bold mt-2">--</h2>
+            <p class="text-[9px] text-zinc-700 mt-1">hours</p>
+        </div>
+        <div class="glass kpi-card p-6 rounded-3xl text-center">
+            <p class="text-[10px] text-zinc-500 uppercase tracking-widest">SLA Compliance</p>
+            <h2 id="kpi-sla" class="text-4xl font-bold mt-2">--</h2>
+            <p class="text-[9px] text-zinc-700 mt-1">% resolved on time</p>
+        </div>
+    </div>
+
+    <!-- QUEUE HEALTH + TREND -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+        <!-- Queue Health -->
+        <div class="glass p-6 rounded-[2rem]">
+            <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-5">Queue Health</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-[10px] text-zinc-500 uppercase">Open</span>
+                    <span id="q-open" class="text-lg font-bold text-red-400">--</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-[10px] text-zinc-500 uppercase">In Progress</span>
+                    <span id="q-inprog" class="text-lg font-bold text-blue-400">--</span>
+                </div>
+                <div class="flex justify-between items-center border-t border-white/5 pt-3">
+                    <span class="text-[10px] text-yellow-600 uppercase">Near Breach</span>
+                    <span id="q-near" class="text-lg font-bold text-yellow-400">--</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-[10px] text-red-600 uppercase">SLA Breached</span>
+                    <span id="q-breach" class="text-lg font-bold text-red-500">--</span>
+                </div>
+                <div class="flex justify-between items-center border-t border-white/5 pt-3">
+                    <span class="text-[10px] text-zinc-600 uppercase">Total Assigned</span>
+                    <span id="q-total" class="text-lg font-bold">--</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-[10px] text-zinc-600 uppercase">Total Resolved</span>
+                    <span id="q-resolved" class="text-lg font-bold text-green-500">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7-day Trend -->
+        <div class="lg:col-span-2 glass p-6 rounded-[2rem]">
+            <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">My Tickets — Last 7 Days</h3>
+            <canvas id="trendChart" height="130"></canvas>
+        </div>
+    </div>
+
+    <!-- SLA COMPLIANCE BAR -->
+    <div class="glass p-6 rounded-[2rem] mb-6">
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-widest">SLA Compliance</h3>
+            <span id="sla-pct-label" class="text-xs font-bold text-white">--%</span>
+        </div>
+        <div class="w-full bg-zinc-900 rounded-full h-3 overflow-hidden">
+            <div id="sla-bar" class="h-full rounded-full transition-all duration-700 bg-green-500" style="width:0%"></div>
+        </div>
+        <div class="flex justify-between mt-2">
+            <span class="text-[9px] text-zinc-700">0%</span>
+            <span class="text-[9px] text-zinc-700">Target: 90%</span>
+            <span class="text-[9px] text-zinc-700">100%</span>
+        </div>
+    </div>
+
+    <!-- QUICK LINKS -->
+    <div class="grid grid-cols-2 gap-4">
+        <a href="/agent/queue" class="glass p-5 rounded-2xl flex items-center gap-4 hover:border-red-600/40 transition-colors group">
+            <span class="text-3xl">📋</span>
+            <div>
+                <p class="text-xs font-bold uppercase tracking-widest group-hover:text-red-400 transition-colors">My Queue</p>
+                <p class="text-[9px] text-zinc-600 mt-0.5">View &amp; manage assigned tickets</p>
+            </div>
+        </a>
+        <a href="/tickets" class="glass p-5 rounded-2xl flex items-center gap-4 hover:border-red-600/40 transition-colors group">
+            <span class="text-3xl">🎫</span>
+            <div>
+                <p class="text-xs font-bold uppercase tracking-widest group-hover:text-red-400 transition-colors">All Tickets</p>
+                <p class="text-[9px] text-zinc-600 mt-0.5">Browse the full ticket list</p>
+            </div>
+        </a>
+    </div>
+</div>
+
+<script>
+    let trendChart;
+
+    async function loadStats() {
+        try {
+            const res  = await fetch('/api/agent/stats');
+            const data = await res.json();
+
+            document.getElementById('kpi-today').textContent  = data.resolved_today;
+            document.getElementById('kpi-week').textContent   = data.resolved_week;
+            document.getElementById('kpi-avg').textContent    = data.avg_resolution + 'h';
+            document.getElementById('kpi-sla').textContent    = data.sla_compliance + '%';
+            document.getElementById('q-open').textContent     = data.queue_open;
+            document.getElementById('q-inprog').textContent   = data.queue_inprogress;
+            document.getElementById('q-near').textContent     = data.queue_near_breach;
+            document.getElementById('q-breach').textContent   = data.queue_breached;
+            document.getElementById('q-total').textContent    = data.total_assigned;
+            document.getElementById('q-resolved').textContent = data.total_resolved;
+
+            // SLA compliance bar
+            const pct = data.sla_compliance || 0;
+            document.getElementById('sla-pct-label').textContent = pct + '%';
+            const bar = document.getElementById('sla-bar');
+            bar.style.width = pct + '%';
+            bar.className = `h-full rounded-full transition-all duration-700 ${pct >= 90 ? 'bg-green-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`;
+
+            // Color the SLA KPI card
+            const slaEl = document.getElementById('kpi-sla');
+            slaEl.className = `text-4xl font-bold mt-2 ${pct >= 90 ? 'text-green-400' : pct >= 70 ? 'text-yellow-400' : 'text-red-400'}`;
+
+            // Trend chart
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            if (trendChart) trendChart.destroy();
+            trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.trend.labels,
+                    datasets: [{
+                        data: data.trend.values,
+                        backgroundColor: 'rgba(220,38,38,0.7)',
+                        borderColor: '#dc2626',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#555', font: { size: 9 } } },
+                        y: { grid: { color: '#111' },  ticks: { color: '#555', font: { size: 9 }, stepSize: 1 } }
+                    }
+                }
+            });
+
+        } catch(e) { console.error(e); }
+    }
+
+    loadStats();
+    setInterval(loadStats, 30000);
+</script>
+</body>
+</html>

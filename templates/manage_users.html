@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management — IT Helpdesk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #050505; color: white; font-family: sans-serif; }
+        .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); }
+        select option { background: #111; }
+        .tab-btn { padding: 0.5rem 1.25rem; border-radius: 0.75rem; font-size: 0.75rem; font-weight: 700;
+            text-transform: uppercase; transition: all 0.2s; letter-spacing: 0.05em; }
+        .tab-btn.active { background: #dc2626; color: white; }
+        .tab-btn:not(.active) { background: transparent; color: #52525b; border: 1px solid #27272a; }
+        .tab-btn:not(.active):hover { color: white; border-color: #52525b; }
+        .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.75rem 1.25rem;
+            border-radius: 0.75rem; font-size: 0.75rem; font-weight: 700; z-index: 100;
+            transform: translateY(4rem); opacity: 0; transition: all 0.3s ease; }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); color: #4ade80; }
+        .toast.error   { background: rgba(220,38,38,0.15); border: 1px solid rgba(220,38,38,0.4); color: #f87171; }
+        .badge-online { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; }
+        .badge-away   { background: rgba(234,179,8,0.15);  border: 1px solid rgba(234,179,8,0.3);  color: #facc15; }
+        .badge-busy   { background: rgba(220,38,38,0.15);  border: 1px solid rgba(220,38,38,0.3);  color: #f87171; }
+        .skill-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+            background: rgba(220,38,38,0.1); border: 1px solid rgba(220,38,38,0.25);
+            border-radius: 9999px; font-size: 0.65rem; font-weight: 700; color: #f87171; }
+        .workload-bar { height: 4px; border-radius: 9999px; background: #27272a; }
+        .workload-fill { height: 100%; border-radius: 9999px; transition: width 0.4s; }
+        input[type=checkbox].skill-cb { accent-color: #dc2626; }
+        .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200;
+            display: flex; align-items: center; justify-content: center; }
+        .modal { background: #0d0d0d; border: 1px solid rgba(220,38,38,0.3); border-radius: 1.5rem;
+            padding: 2rem; width: 90%; max-width: 480px; }
+    </style>
+</head>
+<body class="p-6">
+<div class="max-w-5xl mx-auto">
+
+    {% set active = 'manage_users' %}
+    {% include 'nav.html' %}
+
+    <!-- HEADER -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-black italic">USER <span class="text-red-600">MANAGEMENT</span></h1>
+        <p class="text-xs text-zinc-500 mt-1">Create, edit, and remove user accounts. Configure agent skills and availability.</p>
+    </div>
+
+    <!-- TABS -->
+    <div class="flex gap-2 mb-6">
+        <button class="tab-btn active" id="tab-list"   onclick="switchTab('list')">👥 All Users</button>
+        <button class="tab-btn"        id="tab-create" onclick="switchTab('create')">➕ Create User</button>
+        <button class="tab-btn"        id="tab-agents" onclick="switchTab('agents')">🎯 Agent Overview</button>
+    </div>
+
+    <!-- ===== TAB: USER LIST ===== -->
+    <div id="panel-list">
+        <div class="glass p-6 rounded-3xl">
+            <!-- Filters -->
+            <div class="flex gap-3 mb-5 flex-wrap">
+                <input id="filter-search" type="text" placeholder="Search by name or email…"
+                       oninput="renderUsers()"
+                       class="bg-black border border-zinc-800 px-3 py-2 rounded-xl text-xs text-zinc-300 outline-none focus:border-red-600 w-52">
+                <select id="filter-role" onchange="renderUsers()"
+                        class="bg-black border border-zinc-800 px-3 py-2 rounded-xl text-xs text-zinc-300 outline-none focus:border-red-600">
+                    <option value="">All Roles</option>
+                    <option value="admin">Admin</option>
+                    <option value="agent">Agent</option>
+                    <option value="user">User</option>
+                </select>
+                <select id="filter-avail" onchange="renderUsers()"
+                        class="bg-black border border-zinc-800 px-3 py-2 rounded-xl text-xs text-zinc-300 outline-none focus:border-red-600">
+                    <option value="">All Statuses</option>
+                    <option value="online">Online</option>
+                    <option value="away">Away</option>
+                    <option value="busy">Busy</option>
+                </select>
+                <button onclick="loadUsers()" class="ml-auto text-[10px] bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:border-zinc-600 transition-colors">↻ Refresh</button>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-left text-zinc-600 uppercase tracking-widest border-b border-white/5">
+                            <th class="pb-3 pr-4">User</th>
+                            <th class="pb-3 pr-4">Role</th>
+                            <th class="pb-3 pr-4">Status</th>
+                            <th class="pb-3 pr-4">Skills</th>
+                            <th class="pb-3 pr-4">Workload</th>
+                            <th class="pb-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody" class="divide-y divide-white/5"></tbody>
+                </table>
+                <p id="users-empty" class="hidden text-center text-zinc-600 py-8">No users found.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TAB: CREATE USER ===== -->
+    <div id="panel-create" class="hidden">
+        <div class="glass p-8 rounded-3xl max-w-lg">
+            <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">Create New User</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Full Name *</label>
+                    <input id="c-name" type="text" placeholder="e.g. John Smith"
+                           class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-sm transition-colors">
+                </div>
+                <div>
+                    <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Email Address *</label>
+                    <input id="c-email" type="email" placeholder="e.g. john@company.com"
+                           class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-sm transition-colors">
+                </div>
+                <div>
+                    <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Password * (min 6 chars)</label>
+                    <input id="c-password" type="password" placeholder="••••••••"
+                           class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-sm transition-colors">
+                </div>
+                <div>
+                    <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Role *</label>
+                    <select id="c-role" onchange="toggleSkillsSection('c')"
+                            class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-zinc-300 transition-colors">
+                        <option value="user">User</option>
+                        <option value="agent">Agent</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <!-- Agent-only fields -->
+                <div id="c-agent-fields" class="hidden space-y-4 border border-zinc-800 rounded-2xl p-4">
+                    <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Agent Settings</p>
+                    <div>
+                        <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Skills (ticket categories this agent handles)</label>
+                        <div class="grid grid-cols-2 gap-2" id="c-skills-grid"></div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Max Concurrent Tickets</label>
+                        <input id="c-maxwl" type="number" min="1" max="50" value="10"
+                               class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-sm transition-colors">
+                    </div>
+                </div>
+                <button onclick="createUser()"
+                        class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition-colors text-sm">
+                    Create User
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TAB: AGENT OVERVIEW ===== -->
+    <div id="panel-agents" class="hidden">
+        <div class="glass p-6 rounded-3xl">
+            <div class="flex items-center justify-between mb-5">
+                <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">Agent Availability & Load</h2>
+                <button onclick="loadAgents()" class="text-[10px] bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:border-zinc-600 transition-colors">↻ Refresh</button>
+            </div>
+            <div id="agents-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+            <p id="agents-empty" class="hidden text-center text-zinc-600 py-8">No agents found. Create agents in the "Create User" tab.</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- EDIT MODAL -->
+<div id="edit-modal" class="modal-bg hidden" onclick="closeModalOnBg(event)">
+    <div class="modal">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="font-bold text-sm uppercase tracking-widest">Edit User</h3>
+            <button onclick="closeEditModal()" class="text-zinc-600 hover:text-white text-lg leading-none">✕</button>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Name</label>
+                <input id="m-name" type="text"
+                       class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-sm">
+            </div>
+            <div>
+                <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Role</label>
+                <select id="m-role" onchange="toggleSkillsSection('m')"
+                        class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-zinc-300">
+                    <option value="user">User</option>
+                    <option value="agent">Agent</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <!-- Agent-only fields -->
+            <div id="m-agent-fields" class="hidden space-y-4 border border-zinc-800 rounded-2xl p-4">
+                <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Agent Settings</p>
+                <div>
+                    <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Availability</label>
+                    <select id="m-avail"
+                            class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-zinc-300">
+                        <option value="online">🟢 Online</option>
+                        <option value="away">🟡 Away</option>
+                        <option value="busy">🔴 Busy</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Skills</label>
+                    <div class="grid grid-cols-2 gap-2" id="m-skills-grid"></div>
+                </div>
+                <div>
+                    <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-1">Max Concurrent Tickets</label>
+                    <input id="m-maxwl" type="number" min="1" max="50"
+                           class="w-full bg-black border border-zinc-800 p-3 rounded-xl outline-none focus:border-red-600 text-sm">
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button onclick="saveEditModal()"
+                        class="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">
+                    Save Changes
+                </button>
+                <button onclick="closeEditModal()"
+                        class="flex-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-bold py-2.5 rounded-xl text-sm transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div id="del-modal" class="modal-bg hidden" onclick="closeDelModalOnBg(event)">
+    <div class="modal max-w-sm">
+        <h3 class="font-bold text-sm uppercase tracking-widest mb-3 text-red-400">Delete User</h3>
+        <p class="text-zinc-400 text-sm mb-1">You are about to permanently delete:</p>
+        <p id="del-user-info" class="text-white font-bold font-mono text-sm mb-5"></p>
+        <p class="text-zinc-600 text-xs mb-5">This action cannot be undone. Existing tickets assigned to this user will remain.</p>
+        <div class="flex gap-3">
+            <button onclick="confirmDelete()"
+                    class="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">
+                Delete
+            </button>
+            <button onclick="closeDelModal()"
+                    class="flex-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-bold py-2.5 rounded-xl text-sm transition-colors">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<script>
+    const ALL_SKILLS = ['Network','Hardware','Software','Security','Access','Email','Printer','Other'];
+    let allUsers = [];
+    let editingEmail = null;
+    let deletingEmail = null;
+
+    // ── Tab switching ──────────────────────────────────────────────────────────
+    function switchTab(tab) {
+        ['list','create','agents'].forEach(t => {
+            document.getElementById('panel-' + t).classList.toggle('hidden', t !== tab);
+            document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+        });
+        if (tab === 'list')   loadUsers();
+        if (tab === 'agents') loadAgents();
+        if (tab === 'create') buildSkillsGrid('c-skills-grid', []);
+    }
+
+    // ── Toast ──────────────────────────────────────────────────────────────────
+    function showToast(msg, type='success') {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = `toast ${type} show`;
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // ── Build skill checkboxes ─────────────────────────────────────────────────
+    function buildSkillsGrid(containerId, selected=[]) {
+        const grid = document.getElementById(containerId);
+        grid.innerHTML = ALL_SKILLS.map(s => `
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" class="skill-cb" value="${s}" ${selected.includes(s) ? 'checked' : ''}>
+                <span class="text-xs text-zinc-400">${s}</span>
+            </label>`).join('');
+    }
+
+    function getCheckedSkills(containerId) {
+        return Array.from(document.querySelectorAll(`#${containerId} input.skill-cb:checked`))
+                    .map(cb => cb.value);
+    }
+
+    // ── Toggle agent-only fields ───────────────────────────────────────────────
+    function toggleSkillsSection(prefix) {
+        const role   = document.getElementById(prefix + '-role').value;
+        const fields = document.getElementById(prefix + '-agent-fields');
+        fields.classList.toggle('hidden', role !== 'agent');
+    }
+
+    // ── Load all users ─────────────────────────────────────────────────────────
+    async function loadUsers() {
+        try {
+            const res = await fetch('/api/admin/users');
+            allUsers  = await res.json();
+            renderUsers();
+        } catch(e) { showToast('Failed to load users', 'error'); }
+    }
+
+    function renderUsers() {
+        const search = document.getElementById('filter-search').value.toLowerCase();
+        const role   = document.getElementById('filter-role').value;
+        const avail  = document.getElementById('filter-avail').value;
+
+        const filtered = allUsers.filter(u => {
+            const matchSearch = !search || u.email.toLowerCase().includes(search) || u.name.toLowerCase().includes(search);
+            const matchRole   = !role  || u.role === role;
+            const matchAvail  = !avail || u.availability_status === avail;
+            return matchSearch && matchRole && matchAvail;
+        });
+
+        const tbody = document.getElementById('users-tbody');
+        const empty = document.getElementById('users-empty');
+
+        if (!filtered.length) {
+            tbody.innerHTML = '';
+            empty.classList.remove('hidden');
+            return;
+        }
+        empty.classList.add('hidden');
+
+        tbody.innerHTML = filtered.map(u => {
+            const statusBadge = u.role === 'agent'
+                ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold badge-${u.availability_status}">
+                     ${u.availability_status === 'online' ? '🟢' : u.availability_status === 'away' ? '🟡' : '🔴'} ${u.availability_status}
+                   </span>`
+                : `<span class="text-zinc-700 text-[10px]">—</span>`;
+
+            const roleBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase
+                ${u.role === 'admin' ? 'bg-purple-900/40 text-purple-400 border border-purple-800/40' :
+                  u.role === 'agent' ? 'bg-blue-900/40 text-blue-400 border border-blue-800/40' :
+                                       'bg-zinc-900 text-zinc-500 border border-zinc-800'}">${u.role}</span>`;
+
+            const skills = u.role === 'agent' && u.skills && u.skills.length
+                ? u.skills.map(s => `<span class="skill-chip">${s}</span>`).join(' ')
+                : `<span class="text-zinc-700 text-[10px]">—</span>`;
+
+            const workloadHtml = u.role === 'agent'
+                ? (() => {
+                    const pct  = Math.min(100, Math.round((u.current_workload / (u.max_workload || 10)) * 100));
+                    const color = pct >= 90 ? '#dc2626' : pct >= 60 ? '#f59e0b' : '#22c55e';
+                    return `<div class="flex items-center gap-2">
+                        <span class="text-[10px] text-zinc-400 font-mono w-12">${u.current_workload}/${u.max_workload}</span>
+                        <div class="workload-bar flex-1 min-w-16">
+                            <div class="workload-fill" style="width:${pct}%;background:${color}"></div>
+                        </div>
+                    </div>`;
+                  })()
+                : `<span class="text-zinc-700 text-[10px]">—</span>`;
+
+            return `<tr class="hover:bg-white/5 transition-colors group">
+                <td class="py-3 pr-4">
+                    <p class="font-mono font-bold text-white text-xs">${escHtml(u.name)}</p>
+                    <p class="text-zinc-600 text-[10px]">${escHtml(u.email)}</p>
+                </td>
+                <td class="py-3 pr-4">${roleBadge}</td>
+                <td class="py-3 pr-4">${statusBadge}</td>
+                <td class="py-3 pr-4 max-w-[180px]"><div class="flex flex-wrap gap-1">${skills}</div></td>
+                <td class="py-3 pr-4 min-w-[120px]">${workloadHtml}</td>
+                <td class="py-3">
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onclick="openEditModal(${JSON.stringify(JSON.stringify(u))})"
+                                class="text-[10px] bg-zinc-900 border border-zinc-800 px-2 py-1 rounded-lg hover:border-red-600 hover:text-red-400 transition-colors">
+                            Edit
+                        </button>
+                        <button onclick="openDelModal('${escHtml(u.email)}', '${escHtml(u.name)}')"
+                                class="text-[10px] bg-red-900/20 border border-red-900/40 text-red-400 px-2 py-1 rounded-lg hover:bg-red-900/40 transition-colors">
+                            Delete
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function escHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Edit modal ─────────────────────────────────────────────────────────────
+    function openEditModal(userJson) {
+        const u = JSON.parse(userJson);
+        editingEmail = u.email;
+        document.getElementById('m-name').value  = u.name || '';
+        document.getElementById('m-role').value  = u.role || 'user';
+        document.getElementById('m-avail').value = u.availability_status || 'online';
+        document.getElementById('m-maxwl').value = u.max_workload || 10;
+        buildSkillsGrid('m-skills-grid', u.skills || []);
+        toggleSkillsSection('m');
+        document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+        document.getElementById('edit-modal').classList.add('hidden');
+        editingEmail = null;
+    }
+
+    function closeModalOnBg(e) {
+        if (e.target === document.getElementById('edit-modal')) closeEditModal();
+    }
+
+    async function saveEditModal() {
+        if (!editingEmail) return;
+        const role = document.getElementById('m-role').value;
+        const payload = {
+            email:               editingEmail,
+            name:                document.getElementById('m-name').value.trim(),
+            role:                role,
+            availability_status: document.getElementById('m-avail').value,
+            skills:              role === 'agent' ? getCheckedSkills('m-skills-grid') : [],
+            max_workload:        parseInt(document.getElementById('m-maxwl').value) || 10
+        };
+        try {
+            const res  = await fetch('/api/admin/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+            const data = await res.json();
+            if (data.success) {
+                showToast('User updated successfully');
+                closeEditModal();
+                loadUsers();
+            } else {
+                showToast(data.error || 'Update failed', 'error');
+            }
+        } catch(e) { showToast('Network error', 'error'); }
+    }
+
+    // ── Delete modal ───────────────────────────────────────────────────────────
+    function openDelModal(email, name) {
+        deletingEmail = email;
+        document.getElementById('del-user-info').textContent = `${name} <${email}>`;
+        document.getElementById('del-modal').classList.remove('hidden');
+    }
+
+    function closeDelModal() {
+        document.getElementById('del-modal').classList.add('hidden');
+        deletingEmail = null;
+    }
+
+    function closeDelModalOnBg(e) {
+        if (e.target === document.getElementById('del-modal')) closeDelModal();
+    }
+
+    async function confirmDelete() {
+        if (!deletingEmail) return;
+        try {
+            const res  = await fetch('/api/admin/users/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: deletingEmail }) });
+            const data = await res.json();
+            if (data.success) {
+                showToast('User deleted');
+                closeDelModal();
+                loadUsers();
+            } else {
+                showToast(data.error || 'Delete failed', 'error');
+            }
+        } catch(e) { showToast('Network error', 'error'); }
+    }
+
+    // ── Create user ────────────────────────────────────────────────────────────
+    async function createUser() {
+        const role = document.getElementById('c-role').value;
+        const payload = {
+            name:         document.getElementById('c-name').value.trim(),
+            email:        document.getElementById('c-email').value.trim(),
+            password:     document.getElementById('c-password').value,
+            role:         role,
+            skills:       role === 'agent' ? getCheckedSkills('c-skills-grid') : [],
+            max_workload: parseInt(document.getElementById('c-maxwl').value) || 10
+        };
+        if (!payload.name || !payload.email || !payload.password) {
+            showToast('Name, email, and password are required', 'error'); return;
+        }
+        try {
+            const res  = await fetch('/api/admin/users/create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+            const data = await res.json();
+            if (data.success) {
+                showToast('User created successfully');
+                // Clear form
+                ['c-name','c-email','c-password'].forEach(id => document.getElementById(id).value = '');
+                document.getElementById('c-role').value = 'user';
+                toggleSkillsSection('c');
+            } else {
+                showToast(data.error || 'Creation failed', 'error');
+            }
+        } catch(e) { showToast('Network error', 'error'); }
+    }
+
+    // ── Agent overview tab ─────────────────────────────────────────────────────
+    async function loadAgents() {
+        try {
+            const res    = await fetch('/api/agents/available');
+            const agents = await res.json();
+            const grid   = document.getElementById('agents-grid');
+            const empty  = document.getElementById('agents-empty');
+
+            if (!agents.length) {
+                grid.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+
+            grid.innerHTML = agents.map(a => {
+                const pct   = Math.min(100, Math.round((a.current_workload / (a.max_workload || 10)) * 100));
+                const color = pct >= 90 ? '#dc2626' : pct >= 60 ? '#f59e0b' : '#22c55e';
+                const statusDot = a.availability_status === 'online' ? '🟢' : a.availability_status === 'away' ? '🟡' : '🔴';
+                const skills = a.skills && a.skills.length
+                    ? a.skills.map(s => `<span class="skill-chip">${s}</span>`).join('')
+                    : '<span class="text-zinc-700 text-[10px]">No skills configured</span>';
+                return `<div class="glass rounded-2xl p-4">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <p class="font-bold text-sm">${escHtml(a.name)}</p>
+                            <p class="text-zinc-600 text-[10px] font-mono">${escHtml(a.email)}</p>
+                        </div>
+                        <span class="text-xs">${statusDot} <span class="capitalize text-zinc-400">${a.availability_status}</span></span>
+                    </div>
+                    <div class="mb-3">
+                        <div class="flex justify-between text-[10px] text-zinc-500 mb-1">
+                            <span>Workload</span>
+                            <span>${a.current_workload} / ${a.max_workload} tickets</span>
+                        </div>
+                        <div class="workload-bar">
+                            <div class="workload-fill" style="width:${pct}%;background:${color}"></div>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-1">${skills}</div>
+                </div>`;
+            }).join('');
+        } catch(e) { showToast('Failed to load agents', 'error'); }
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    loadUsers();
+    buildSkillsGrid('c-skills-grid', []);
+</script>
+</body>
+</html>

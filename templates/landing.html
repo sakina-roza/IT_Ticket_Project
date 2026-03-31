@@ -499,19 +499,9 @@
         setTimeout(() => document.getElementById('enter-btn').classList.add('visible'), 600);
         setTimeout(() => document.getElementById('status-bar').classList.add('visible'), 800);
 
-        // Animate counters (fetched from API)
-        fetch('/api/stats')
-            .then(r => r.json())
-            .then(data => {
-                animateCount('s1', 0, data.stats.total, '', 1200);
-                animateCount('s2', 0, 94, '%', 1400);
-                animateCount('s3', 0, Math.round(data.stats.avg_res), 'h', 1600);
-            })
-            .catch(() => {
-                animateCount('s1', 0, 500, '', 1200);
-                animateCount('s2', 0, 94, '%', 1400);
-                animateCount('s3', 0, 6, 'h', 1600);
-            });
+        animateCount('s1', 0, 500, '+', 1200);
+        animateCount('s2', 0, 94, '%', 1400);
+        animateCount('s3', 0, 6, 'h', 1600);
     }
 
     function animateCount(id, from, to, suffix, delay) {
