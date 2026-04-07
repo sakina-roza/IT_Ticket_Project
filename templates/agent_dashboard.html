@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
-        body { background: #050505; color: white; font-family: sans-serif; }
+        body { background: #000000; color: white; font-family: sans-serif; }
         .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); }
         .kpi-card { transition: transform 0.2s; }
         .kpi-card:hover { transform: translateY(-2px); }
@@ -59,7 +59,7 @@
             <div class="space-y-3">
                 <div class="flex justify-between items-center">
                     <span class="text-[10px] text-zinc-500 uppercase">Open</span>
-                    <span id="q-open" class="text-lg font-bold text-red-400">--</span>
+                    <span id="q-open" class="text-lg font-bold text-blue-400">--</span>
                 </div>
                 <div class="flex justify-between items-center">
                     <span class="text-[10px] text-zinc-500 uppercase">In Progress</span>
@@ -112,14 +112,14 @@
         <a href="/agent/queue" class="glass p-5 rounded-2xl flex items-center gap-4 hover:border-red-600/40 transition-colors group">
             <span class="text-3xl">📋</span>
             <div>
-                <p class="text-xs font-bold uppercase tracking-widest group-hover:text-red-400 transition-colors">My Queue</p>
+                <p class="text-xs font-bold uppercase tracking-widest group-hover:text-red-500 transition-colors">My Queue</p>
                 <p class="text-[9px] text-zinc-600 mt-0.5">View &amp; manage assigned tickets</p>
             </div>
         </a>
         <a href="/tickets" class="glass p-5 rounded-2xl flex items-center gap-4 hover:border-red-600/40 transition-colors group">
             <span class="text-3xl">🎫</span>
             <div>
-                <p class="text-xs font-bold uppercase tracking-widest group-hover:text-red-400 transition-colors">All Tickets</p>
+                <p class="text-xs font-bold uppercase tracking-widest group-hover:text-red-500 transition-colors">All Tickets</p>
                 <p class="text-[9px] text-zinc-600 mt-0.5">Browse the full ticket list</p>
             </div>
         </a>

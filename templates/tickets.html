@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #050505; color: white; font-family: sans-serif; }
+        body { background: #000000; color: white; font-family: sans-serif; }
         .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); }
         select option { background: #111; }
     </style>
@@ -105,7 +105,7 @@
 
     const SLA_COLOR = { on_track: 'text-green-400', near_breach: 'text-yellow-400', breached: 'text-red-400', unknown: 'text-zinc-600' };
     const SLA_LABEL = { on_track: '🟢 OK', near_breach: '🟡 Near', breached: '🔴 Breach', unknown: '⚪ N/A' };
-    const PRI_COLOR = { Critical: 'text-red-400', High: 'text-orange-400', Medium: 'text-yellow-400', Low: 'text-zinc-400' };
+    const PRI_COLOR = { Critical: 'text-red-400', High: 'text-red-400', Medium: 'text-yellow-400', Low: 'text-zinc-400' };
 
     // Apply URL params (drill-down from dashboard charts)
     const urlParams = new URLSearchParams(window.location.search);

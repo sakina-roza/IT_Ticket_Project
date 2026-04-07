@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Merge Duplicate Tickets</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #000000; color: white; font-family: sans-serif; }
+        .glass  { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.15); }
+        .glass2 { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); }
+        select option { background: #111; }
+
+        /* Priority badges */
+        .badge-Critical { background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.4);color:#f87171; }
+        .badge-High     { background:rgba(234,88,12,0.15); border:1px solid rgba(234,88,12,0.4);color:#fb923c; }
+        .badge-Medium   { background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.4);color:#facc15; }
+        .badge-Low      { background:rgba(63,63,70,0.4);   border:1px solid rgba(113,113,122,0.4);color:#a1a1aa; }
+
+        /* Status badges */
+        .status-Open        { color:#60a5fa; }
+        .status-In-Progress { color:#facc15; }
+        .status-Resolved    { color:#4ade80; }
+        .status-Closed      { color:#71717a; }
+
+        /* Ticket card */
+        .t-card {
+            border-radius: 0.875rem;
+            border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.02);
+            padding: 0.75rem 1rem;
+            transition: all 0.15s;
+            cursor: pointer;
+            user-select: none;
+        }
+        .t-card:hover  { border-color: rgba(220,38,38,0.3); background: rgba(220,38,38,0.03); }
+        .t-card.master { border-color: rgba(59,130,246,0.6) !important; background: rgba(59,130,246,0.06) !important; }
+        .t-card.dup    { border-color: rgba(220,38,38,0.5) !important; background: rgba(220,38,38,0.05) !important; }
+        .t-card.checked-master { outline: 2px solid rgba(59,130,246,0.7); }
+        .t-card.checked-dup    { outline: 2px solid rgba(220,38,38,0.5); }
+
+        /* Group card */
+        .group-card {
+            border: 1px solid rgba(234,179,8,0.2);
+            background: rgba(234,179,8,0.03);
+            border-radius: 1.25rem;
+            padding: 1.25rem;
+        }
+
+        /* Similarity badge */
+        .sim-high   { background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.3);color:#f87171; }
+        .sim-medium { background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.3);color:#facc15; }
+        .sim-low    { background:rgba(63,63,70,0.3);  border:1px solid rgba(113,113,122,0.3);color:#a1a1aa; }
+
+        /* Toast */
+        .toast { position:fixed; bottom:1.5rem; right:1.5rem; padding:0.75rem 1.25rem;
+            border-radius:0.75rem; font-size:0.75rem; font-weight:700; z-index:200;
+            transform:translateY(4rem); opacity:0; transition:all 0.3s ease; pointer-events:none; }
+        .toast.show { transform:translateY(0); opacity:1; }
+        .toast.success { background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.4); color:#4ade80; }
+        .toast.error   { background:rgba(220,38,38,0.15); border:1px solid rgba(220,38,38,0.4); color:#f87171; }
+
+        /* Manual picker */
+        .pick-card { border-radius:0.75rem; border:1px solid rgba(255,255,255,0.05);
+            background:rgba(255,255,255,0.02); padding:0.6rem 0.85rem; cursor:pointer; transition:all 0.15s; }
+        .pick-card:hover { border-color:rgba(220,38,38,0.3); }
+        .pick-card.in-master { border-color:rgba(59,130,246,0.5); background:rgba(59,130,246,0.06); }
+        .pick-card.in-dup    { border-color:rgba(220,38,38,0.5);  background:rgba(220,38,38,0.06); }
+
+        ::-webkit-scrollbar { width:4px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:rgba(220,38,38,0.3); border-radius:99px; }
+    </style>
+</head>
+<body class="p-6">
+<div class="max-w-5xl mx-auto">
+
+    {% set active = 'merge' %}
+    {% include 'nav.html' %}
+
+    <!-- HEADER -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-black italic">MERGE <span class="text-red-600">DUPLICATES</span></h1>
+        <p class="text-xs text-zinc-500 mt-1">Combine redundant or duplicate tickets. The master ticket is kept; duplicates are closed and their content is merged in.</p>
+    </div>
+
+    <!-- TABS -->
+    <div class="flex gap-2 mb-6">
+        <button id="tab-auto" onclick="switchTab('auto')"
+                class="tab-btn px-5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-red-600 text-white">
+            🤖 Auto-Detected
+        </button>
+        <button id="tab-manual" onclick="switchTab('manual')"
+                class="tab-btn px-5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-transparent border border-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-600">
+            ✋ Manual Select
+        </button>
+    </div>
+
+    <!-- ══════════════ AUTO TAB ══════════════ -->
+    <div id="panel-auto">
+        <div class="flex items-center justify-between mb-4">
+            <p class="text-xs text-zinc-500">Tickets grouped by keyword similarity (≥ 30 % word overlap) and shared category/creator.</p>
+            <button onclick="loadDuplicates()" class="text-[10px] text-zinc-600 hover:text-red-500 transition-colors">↻ Re-scan</button>
+        </div>
+        <div id="auto-loading" class="text-center py-16">
+            <div class="text-3xl mb-3 animate-spin inline-block">⟳</div>
+            <p class="text-zinc-600 text-xs mt-2">Scanning for duplicates...</p>
+        </div>
+        <div id="groups-list" class="space-y-5 hidden"></div>
+        <div id="auto-empty" class="hidden text-center py-20">
+            <div class="text-5xl mb-4">✅</div>
+            <p class="text-zinc-400 text-sm font-bold">No duplicate groups found</p>
+            <p class="text-zinc-700 text-xs mt-1">All active tickets appear to be unique</p>
+        </div>
+    </div>
+
+    <!-- ══════════════ MANUAL TAB ══════════════ -->
+    <div id="panel-manual" class="hidden">
+        <div class="glass rounded-2xl p-5 mb-5">
+            <p class="text-xs text-zinc-400 mb-4">
+                Click tickets to build your merge. <span class="text-blue-400 font-bold">Blue</span> = master (kept).
+                <span class="text-red-400 font-bold">Red</span> = duplicate (will be closed).
+                First click = master, subsequent clicks = duplicates.
+            </p>
+            <!-- Filters -->
+            <div class="flex gap-2 flex-wrap mb-4">
+                <input id="m-search" type="text" placeholder="Search tickets..."
+                       oninput="filterManual()"
+                       class="bg-zinc-900 border border-zinc-800 text-xs px-3 py-1.5 rounded-xl text-zinc-300 outline-none focus:border-red-600/50 w-52">
+                <select id="m-category" onchange="filterManual()"
+                        class="bg-zinc-900 border border-zinc-800 text-xs px-3 py-1.5 rounded-xl text-zinc-400 outline-none focus:border-red-600/50">
+                    <option value="">All Categories</option>
+                    <option>Network</option><option>Hardware</option><option>Software</option>
+                    <option>Security</option><option>Access</option><option>Email</option>
+                    <option>Printer</option><option>Other</option>
+                </select>
+                <select id="m-status" onchange="filterManual()"
+                        class="bg-zinc-900 border border-zinc-800 text-xs px-3 py-1.5 rounded-xl text-zinc-400 outline-none focus:border-red-600/50">
+                    <option value="">All Status</option>
+                    <option>Open</option><option>In Progress</option><option>Resolved</option>
+                </select>
+            </div>
+            <div id="manual-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-96 overflow-y-auto pr-1"></div>
+        </div>
+
+        <!-- Selection summary -->
+        <div id="manual-summary" class="hidden glass2 rounded-2xl p-5 mb-4">
+            <p class="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Merge Preview</p>
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1">
+                    <p class="text-[9px] text-blue-400 uppercase font-bold mb-2">Master (kept)</p>
+                    <div id="preview-master" class="text-xs font-mono text-blue-300 glass2 rounded-xl p-3">—</div>
+                </div>
+                <div class="text-zinc-700 self-center text-lg">→</div>
+                <div class="flex-1">
+                    <p class="text-[9px] text-red-400 uppercase font-bold mb-2">Duplicates (will be closed)</p>
+                    <div id="preview-dups" class="text-xs font-mono text-red-300 glass2 rounded-xl p-3 space-y-1">—</div>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-4 justify-end">
+                <button onclick="clearManual()"
+                        class="text-xs text-zinc-600 hover:text-white transition-colors px-4 py-2">
+                    Clear Selection
+                </button>
+                <button onclick="mergeManual()"
+                        class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-xs font-black uppercase transition-all active:scale-95">
+                    Merge Now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirm-modal" class="hidden fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
+    <div class="glass rounded-[2rem] p-8 w-full max-w-lg space-y-5">
+        <h3 class="text-sm font-black uppercase tracking-widest text-red-500">Confirm Merge</h3>
+
+        <div class="space-y-3">
+            <div class="glass2 rounded-xl p-4">
+                <p class="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-1">Master ticket (kept)</p>
+                <p id="modal-master" class="text-sm font-bold font-mono text-blue-300">—</p>
+                <p id="modal-master-desc" class="text-xs text-zinc-500 mt-1"></p>
+            </div>
+            <div class="glass2 rounded-xl p-4">
+                <p class="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-1">Will be closed & merged</p>
+                <div id="modal-dups" class="space-y-1 mt-1"></div>
+            </div>
+        </div>
+
+        <div class="glass2 rounded-xl p-3">
+            <p class="text-[9px] text-zinc-500 leading-relaxed">
+                Duplicate tickets will be <b class="text-blue-400">closed</b>. Their comments, history, and descriptions are copied into the master ticket. All affected users will be notified. <b>This cannot be undone.</b>
+            </p>
+        </div>
+
+        <div class="flex gap-3 justify-end">
+            <button onclick="closeModal()" class="text-xs text-zinc-600 hover:text-white transition-colors px-4 py-2">Cancel</button>
+            <button id="confirm-btn" onclick="confirmMerge()"
+                    class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-xs font-black uppercase transition-all active:scale-95">
+                Confirm Merge
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+    // ── State ──────────────────────────────────────────────────────────────────
+    let allTickets   = [];   // for manual tab
+    let pendingMerge = null; // { master_id, duplicate_ids }
+
+    // manual tab selection
+    let manualMaster = null;
+    let manualDups   = [];
+
+    // ── Tab switcher ───────────────────────────────────────────────────────────
+    function switchTab(tab) {
+        ['auto','manual'].forEach(t => {
+            document.getElementById('panel-' + t).classList.toggle('hidden', t !== tab);
+            const btn = document.getElementById('tab-' + t);
+            if (t === tab) {
+                btn.className = 'tab-btn px-5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-red-600 text-white';
+            } else {
+                btn.className = 'tab-btn px-5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-transparent border border-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-600';
+            }
+        });
+        if (tab === 'manual' && allTickets.length === 0) loadManualTickets();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // AUTO TAB
+    // ══════════════════════════════════════════════════════════════════════════
+    async function loadDuplicates() {
+        document.getElementById('auto-loading').classList.remove('hidden');
+        document.getElementById('groups-list').classList.add('hidden');
+        document.getElementById('auto-empty').classList.add('hidden');
+        try {
+            const res    = await fetch('/api/find_duplicates');
+            const groups = await res.json();
+            document.getElementById('auto-loading').classList.add('hidden');
+
+            if (!groups.length) {
+                document.getElementById('auto-empty').classList.remove('hidden');
+                return;
+            }
+            renderGroups(groups);
+        } catch(e) {
+            document.getElementById('auto-loading').classList.add('hidden');
+            showToast('Failed to scan duplicates', 'error');
+        }
+    }
+
+    function renderGroups(groups) {
+        const list = document.getElementById('groups-list');
+        list.innerHTML = groups.map((group, gi) => {
+            const master  = group[0];
+            const dups    = group.slice(1);
+            const dupIds  = dups.map(d => d.Ticket_ID);
+            return `
+            <div class="group-card">
+                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[9px] font-bold bg-yellow-400/15 border border-yellow-400/30 text-yellow-300 px-2 py-0.5 rounded-full uppercase">
+                            Group ${gi + 1}
+                        </span>
+                        <span class="text-[9px] text-zinc-500">${group.length} similar tickets · category: <b class="text-zinc-300">${esc(master.Category || 'Other')}</b></span>
+                    </div>
+                    <button onclick="openMergeModal('${esc(master.Ticket_ID)}', ${JSON.stringify(dupIds)})"
+                            class="text-[10px] bg-red-600 hover:bg-red-700 px-4 py-1.5 rounded-xl font-black uppercase transition-all active:scale-95">
+                        Merge Group
+                    </button>
+                </div>
+
+                <!-- Cards -->
+                <div class="space-y-2">
+                    ${renderGroupCard(master, true, null)}
+                    ${dups.map(d => renderGroupCard(d, false, d._similarity)).join('')}
+                </div>
+
+                <!-- Inline custom master picker -->
+                <div class="mt-3 pt-3 border-t border-white/5">
+                    <p class="text-[9px] text-zinc-600 mb-2 uppercase font-bold">Choose a different master:</p>
+                    <div class="flex gap-2 flex-wrap">
+                        ${group.map(t => `
+                            <button onclick="changeMaster(${gi}, '${esc(t.Ticket_ID)}', ${JSON.stringify(group.map(x=>x.Ticket_ID))})"
+                                    id="master-btn-${gi}-${esc(t.Ticket_ID)}"
+                                    class="text-[9px] px-3 py-1 rounded-lg font-mono font-bold transition-all
+                                           ${t.Ticket_ID === master.Ticket_ID
+                                               ? 'bg-blue-600/30 border border-blue-500/50 text-blue-300'
+                                               : 'bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-blue-600/40 hover:text-blue-300'}">
+                                ${esc(t.Ticket_ID)}
+                            </button>`).join('')}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+        list.classList.remove('hidden');
+    }
+
+    function renderGroupCard(t, isMaster, similarity) {
+        const simClass = similarity >= 60 ? 'sim-high' : similarity >= 40 ? 'sim-medium' : 'sim-low';
+        const desc = esc(t.Description || '').substring(0, 90) + (t.Description && t.Description.length > 90 ? '…' : '');
+        return `
+        <div class="t-card ${isMaster ? 'master' : 'dup'}">
+            <div class="flex items-start justify-between gap-2">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                        <a href="/tickets/${esc(t.Ticket_ID)}" target="_blank"
+                           onclick="event.stopPropagation()"
+                           class="font-mono text-xs font-black ${isMaster ? 'text-blue-300 hover:text-blue-200' : 'text-red-400 hover:text-red-300'} transition-colors">
+                            ${esc(t.Ticket_ID)}
+                        </a>
+                        ${isMaster ? '<span class="text-[8px] bg-red-600/20 border border-blue-500/30 text-blue-400 px-1.5 py-0.5 rounded font-bold">MASTER</span>' : ''}
+                        <span class="text-[9px] px-2 py-0.5 rounded-full font-bold badge-${t.Priority || 'Low'}">${t.Priority || 'Low'}</span>
+                        <span class="text-[9px] status-${(t.Status||'').replace(' ','-')}">${t.Status || ''}</span>
+                        ${similarity !== null ? `<span class="text-[8px] px-1.5 py-0.5 rounded font-bold ${simClass}">${similarity}% match</span>` : ''}
+                    </div>
+                    <p class="text-[10px] text-zinc-500 leading-relaxed">${desc || '<span class="text-zinc-700">No description</span>'}</p>
+                </div>
+                <div class="text-right shrink-0 text-[9px] text-zinc-700">${esc(String(t.Created_Date||'').substring(0,10))}</div>
+            </div>
+        </div>`;
+    }
+
+    // Change master within a group without full re-render
+    const groupData = {}; // gi → array of ticket ids
+    function changeMaster(gi, newMasterId, allIds) {
+        groupData[gi] = { master: newMasterId, all: allIds };
+        allIds.forEach(tid => {
+            const btn = document.getElementById(`master-btn-${gi}-${tid}`);
+            if (!btn) return;
+            if (tid === newMasterId) {
+                btn.className = 'text-[9px] px-3 py-1 rounded-lg font-mono font-bold transition-all bg-blue-600/30 border border-blue-500/50 text-blue-300';
+            } else {
+                btn.className = 'text-[9px] px-3 py-1 rounded-lg font-mono font-bold transition-all bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-blue-600/40 hover:text-blue-300';
+            }
+        });
+        // Update the merge button for this group
+        const dups = allIds.filter(id => id !== newMasterId);
+        // re-bind onclick by finding the merge button
+        const mergeBtn = document.querySelector(`[data-group-gi="${gi}"]`);
+        if (mergeBtn) mergeBtn.setAttribute('onclick', `openMergeModal('${newMasterId}', ${JSON.stringify(dups)})`);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MANUAL TAB
+    // ══════════════════════════════════════════════════════════════════════════
+    async function loadManualTickets() {
+        try {
+            const res  = await fetch('/api/all_tickets?no_page=true');
+            const data = await res.json();
+            allTickets = (Array.isArray(data) ? data : data.data || [])
+                         .filter(t => !['Closed','Resolved'].includes(t.Status));
+            filterManual();
+        } catch(e) { showToast('Failed to load tickets', 'error'); }
+    }
+
+    function filterManual() {
+        const search = document.getElementById('m-search').value.toLowerCase();
+        const cat    = document.getElementById('m-category').value;
+        const status = document.getElementById('m-status').value;
+
+        let filtered = allTickets;
+        if (search)  filtered = filtered.filter(t =>
+            (t.Ticket_ID||'').toLowerCase().includes(search) ||
+            (t.Description||'').toLowerCase().includes(search) ||
+            (t.Category||'').toLowerCase().includes(search));
+        if (cat)     filtered = filtered.filter(t => t.Category === cat);
+        if (status)  filtered = filtered.filter(t => t.Status   === status);
+
+        renderManualList(filtered);
+    }
+
+    function renderManualList(tickets) {
+        const list = document.getElementById('manual-list');
+        if (!tickets.length) {
+            list.innerHTML = '<p class="text-zinc-700 text-xs col-span-2 text-center py-6">No tickets found</p>';
+            return;
+        }
+        list.innerHTML = tickets.map(t => {
+            const isMaster = manualMaster === t.Ticket_ID;
+            const isDup    = manualDups.includes(t.Ticket_ID);
+            const cls      = isMaster ? 'in-master' : isDup ? 'in-dup' : '';
+            const desc     = esc(t.Description||'').substring(0, 60) + (t.Description && t.Description.length > 60 ? '…' : '');
+            return `
+            <div class="pick-card ${cls}" onclick="toggleManualPick('${esc(t.Ticket_ID)}')">
+                <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+                    <span class="font-mono text-xs font-black ${isMaster ? 'text-blue-300' : isDup ? 'text-red-400' : 'text-zinc-300'}">${esc(t.Ticket_ID)}</span>
+                    ${isMaster ? '<span class="text-[8px] bg-red-600/20 border border-blue-500/30 text-blue-400 px-1.5 rounded font-bold">MASTER</span>' : ''}
+                    ${isDup    ? '<span class="text-[8px] bg-red-600/15 border border-red-500/30 text-red-400 px-1.5 rounded font-bold">DUPLICATE</span>' : ''}
+                    <span class="text-[8px] px-1.5 py-0.5 rounded-full badge-${t.Priority||'Low'}">${t.Priority||'Low'}</span>
+                    <span class="text-[8px] text-zinc-600">${esc(t.Category||'')}</span>
+                </div>
+                <p class="text-[10px] text-zinc-600 leading-snug">${desc || 'No description'}</p>
+            </div>`;
+        }).join('');
+    }
+
+    function toggleManualPick(ticketId) {
+        if (manualMaster === ticketId) {
+            // Deselect master
+            manualMaster = null;
+        } else if (manualDups.includes(ticketId)) {
+            // Deselect duplicate
+            manualDups = manualDups.filter(id => id !== ticketId);
+        } else if (!manualMaster) {
+            // First pick = master
+            manualMaster = ticketId;
+        } else {
+            // Additional picks = duplicates
+            manualDups.push(ticketId);
+        }
+        updateManualSummary();
+        filterManual();
+    }
+
+    function updateManualSummary() {
+        const summary = document.getElementById('manual-summary');
+        if (!manualMaster) {
+            summary.classList.add('hidden');
+            return;
+        }
+        summary.classList.remove('hidden');
+        const masterTicket = allTickets.find(t => t.Ticket_ID === manualMaster) || {};
+        document.getElementById('preview-master').innerHTML =
+            `<span class="font-black">${esc(manualMaster)}</span>` +
+            (masterTicket.Category ? `<span class="text-zinc-500 ml-2">${esc(masterTicket.Category)}</span>` : '');
+
+        const dupEl = document.getElementById('preview-dups');
+        if (!manualDups.length) {
+            dupEl.innerHTML = '<span class="text-zinc-700 italic">None selected yet — click more tickets</span>';
+        } else {
+            dupEl.innerHTML = manualDups.map(id => {
+                const t = allTickets.find(x => x.Ticket_ID === id) || {};
+                return `<div class="flex items-center gap-2"><span class="font-black">${esc(id)}</span><span class="text-zinc-600">${esc(t.Category||'')}</span></div>`;
+            }).join('');
+        }
+    }
+
+    function clearManual() {
+        manualMaster = null;
+        manualDups   = [];
+        updateManualSummary();
+        filterManual();
+    }
+
+    function mergeManual() {
+        if (!manualMaster || !manualDups.length) {
+            showToast('Select a master and at least one duplicate', 'error');
+            return;
+        }
+        openMergeModal(manualMaster, [...manualDups]);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MERGE MODAL
+    // ══════════════════════════════════════════════════════════════════════════
+    function openMergeModal(masterId, dupIds) {
+        pendingMerge = { master_id: masterId, duplicate_ids: dupIds };
+        document.getElementById('modal-master').textContent = masterId;
+
+        // Find master description from allTickets or groups
+        const t = allTickets.find(x => x.Ticket_ID === masterId) || {};
+        document.getElementById('modal-master-desc').textContent =
+            (t.Description || '').substring(0, 100) || '';
+
+        const dupsEl = document.getElementById('modal-dups');
+        dupsEl.innerHTML = dupIds.map(id => {
+            const dt = allTickets.find(x => x.Ticket_ID === id) || {};
+            return `<div class="flex items-center gap-2 text-xs">
+                <span class="font-mono font-black text-blue-400">${esc(id)}</span>
+                <span class="text-zinc-600">${esc(dt.Category||'')} ${dt.Priority ? '· '+esc(dt.Priority) : ''}</span>
+            </div>`;
+        }).join('');
+
+        document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        pendingMerge = null;
+    }
+
+    async function confirmMerge() {
+        if (!pendingMerge) return;
+        const btn = document.getElementById('confirm-btn');
+        btn.disabled   = true;
+        btn.textContent = 'Merging…';
+
+        try {
+            const res  = await fetch('/api/tickets/merge', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(pendingMerge)
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`✓ Merged ${data.merged_count} ticket(s) into ${data.master_id}`, 'success');
+                closeModal();
+                clearManual();
+                await loadDuplicates();          // refresh auto tab
+                if (allTickets.length) await loadManualTickets(); // refresh manual
+            } else {
+                showToast(data.error || 'Merge failed', 'error');
+            }
+        } catch(e) {
+            showToast('Network error', 'error');
+        } finally {
+            btn.disabled    = false;
+            btn.textContent = 'Confirm Merge';
+        }
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function esc(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function showToast(msg, type) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className   = `toast ${type}`;
+        setTimeout(() => t.classList.add('show'), 10);
+        setTimeout(() => t.classList.remove('show'), 4000);
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    loadDuplicates();
+</script>
+</body>
+</html>

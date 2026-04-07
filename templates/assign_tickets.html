@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Assign Tickets</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #000000; color: white; font-family: sans-serif; }
+        .glass  { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.15); }
+        .glass2 { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); }
+        select option { background: #111; }
+
+        /* Priority badges */
+        .badge-Critical { background: rgba(220,38,38,0.15);  border: 1px solid rgba(220,38,38,0.4);  color: #f87171; }
+        .badge-High     { background: rgba(234,88,12,0.15);  border: 1px solid rgba(234,88,12,0.4);  color: #fb923c; }
+        .badge-Medium   { background: rgba(234,179,8,0.15);  border: 1px solid rgba(234,179,8,0.4);  color: #facc15; }
+        .badge-Low      { background: rgba(63,63,70,0.4);    border: 1px solid rgba(113,113,122,0.4); color: #a1a1aa; }
+
+        /* SLA bar */
+        .sla-bar-track { height: 3px; border-radius: 99px; background: rgba(255,255,255,0.06); overflow: hidden; }
+        .sla-bar-fill  { height: 100%; border-radius: 99px; transition: width 0.5s; }
+
+        /* Ticket row */
+        .ticket-row { cursor: pointer; border-radius: 1rem; padding: 0.75rem 1rem; border: 1px solid rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.02); transition: all 0.15s; }
+        .ticket-row:hover { border-color: rgba(220,38,38,0.3); background: rgba(220,38,38,0.04); }
+        .ticket-row.selected { border-color: rgba(220,38,38,0.7) !important; background: rgba(220,38,38,0.08) !important; box-shadow: 0 0 0 1px rgba(220,38,38,0.4); }
+
+        /* Agent card */
+        .agent-card { border-radius: 1rem; padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.02); transition: all 0.15s; }
+        .agent-card.available:hover { border-color: rgba(34,197,94,0.4); background: rgba(34,197,94,0.04); cursor: pointer; }
+        .agent-card.assigned-highlight { border-color: rgba(34,197,94,0.7) !important; background: rgba(34,197,94,0.07) !important; }
+
+        /* Availability dot */
+        .dot-online { background: #22c55e; }
+        .dot-away   { background: #eab308; }
+        .dot-busy   { background: #ef4444; }
+        .dot-offline{ background: #52525b; }
+
+        /* Workload bar */
+        .wl-bar-track { height: 4px; border-radius: 99px; background: rgba(255,255,255,0.06); overflow: hidden; flex: 1; }
+        .wl-bar-fill  { height: 100%; border-radius: 99px; transition: width 0.4s; }
+
+        /* Toast */
+        .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.75rem 1.25rem;
+            border-radius: 0.75rem; font-size: 0.75rem; font-weight: 700; z-index: 200;
+            transform: translateY(4rem); opacity: 0; transition: all 0.3s ease; pointer-events: none; }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); color: #4ade80; }
+        .toast.error   { background: rgba(220,38,38,0.15); border: 1px solid rgba(220,38,38,0.4); color: #f87171; }
+
+        /* Skill chip */
+        .skill-chip { font-size: 9px; padding: 1px 6px; border-radius: 99px;
+            background: rgba(220,38,38,0.1); border: 1px solid rgba(220,38,38,0.25); color: #f87171; font-weight: 700; }
+
+        /* NEW ticket highlight */
+        .ticket-row.is-new { border-color: rgba(250,204,21,0.45) !important; background: rgba(250,204,21,0.04) !important; }
+        .ticket-row.is-new:hover { border-color: rgba(250,204,21,0.7) !important; background: rgba(250,204,21,0.08) !important; }
+        .ticket-row.is-new.selected { border-color: rgba(220,38,38,0.7) !important; background: rgba(220,38,38,0.08) !important; }
+        .new-badge { font-size:8px; padding:1px 6px; border-radius:99px; font-weight:900; letter-spacing:0.06em;
+            background:rgba(250,204,21,0.2); border:1px solid rgba(250,204,21,0.5); color:#facc15;
+            animation: newpulse 2s ease-in-out infinite; }
+        @keyframes newpulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(220,38,38,0.3); border-radius: 99px; }
+    </style>
+</head>
+<body class="p-6">
+<div class="max-w-7xl mx-auto">
+
+    {% set active = 'assign' %}
+    {% include 'nav.html' %}
+
+    <!-- HEADER -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-black italic">TICKET <span class="text-red-600">ASSIGNMENT</span></h1>
+    </div>
+
+    <!-- SUMMARY STATS -->
+    <div id="summary-row" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div class="glass2 rounded-2xl p-4 border-l-2 border-red-600">
+            <p class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Unassigned</p>
+            <p id="stat-unassigned" class="text-2xl font-black text-red-500">—</p>
+            <p class="text-[9px] text-zinc-700 mt-1">No agent yet</p>
+        </div>
+        <div class="glass2 rounded-2xl p-4 border-l-2 border-yellow-500">
+            <p class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Pending Acceptance</p>
+            <p id="stat-pending" class="text-2xl font-black text-yellow-400">—</p>
+            <p class="text-[9px] text-zinc-700 mt-1">Assigned, not accepted</p>
+        </div>
+        <div class="glass2 rounded-2xl p-4 border-l-2 border-green-500">
+            <p class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Agents Online</p>
+            <p id="stat-online" class="text-2xl font-black text-green-400">—</p>
+            <p class="text-[9px] text-zinc-700 mt-1">Available now</p>
+        </div>
+        <div class="glass2 rounded-2xl p-4 border-l-2 border-zinc-600">
+            <p class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Away / Busy</p>
+            <p id="stat-offline" class="text-2xl font-black text-zinc-400">—</p>
+            <p class="text-[9px] text-zinc-700 mt-1">Unavailable</p>
+        </div>
+    </div>
+
+    <!-- SELECTED TICKET BANNER -->
+    <div id="selection-banner" class="hidden glass rounded-2xl p-4 mb-4 border border-red-600/40 bg-red-600/5">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+                <p class="text-[9px] font-bold text-red-400 uppercase tracking-widest">Selected Ticket</p>
+                <p id="banner-ticket-id" class="text-sm font-black font-mono mt-0.5">—</p>
+                <p id="banner-ticket-desc" class="text-xs text-zinc-500 mt-0.5 max-w-lg"></p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="autoAssignSelected()"
+                        class="bg-zinc-800 hover:bg-zinc-700 text-xs font-bold px-4 py-2 rounded-xl transition-all active:scale-95">
+                    ⚡ Auto-Assign
+                </button>
+                <button onclick="clearSelection()"
+                        class="text-xs text-zinc-600 hover:text-red-500 px-3 py-2 transition-colors">
+                    ✕ Clear
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- LEFT: TICKET QUEUE -->
+        <div>
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-sm font-black uppercase tracking-widest">Ticket Queue</h2>
+                        <span id="queue-new-count" class="hidden"></span>
+                    </div>
+                    <p class="text-[10px] text-zinc-600 mt-0.5">Newest arrivals first, then by date</p>
+                </div>
+                <button onclick="loadData()" class="text-[10px] text-zinc-600 hover:text-red-500 transition-colors">↻ Refresh</button>
+            </div>
+
+            <!-- Filters -->
+            <div class="flex gap-2 mb-3 flex-wrap">
+                <select id="filter-priority" onchange="applyFilters()"
+                        class="bg-zinc-900 border border-zinc-800 text-xs px-3 py-1.5 rounded-xl text-zinc-400 outline-none focus:border-red-600/50">
+                    <option value="">All Priorities</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+                <select id="filter-category" onchange="applyFilters()"
+                        class="bg-zinc-900 border border-zinc-800 text-xs px-3 py-1.5 rounded-xl text-zinc-400 outline-none focus:border-red-600/50">
+                    <option value="">All Categories</option>
+                    <option value="Network">Network</option>
+                    <option value="Hardware">Hardware</option>
+                    <option value="Software">Software</option>
+                    <option value="Security">Security</option>
+                    <option value="Access">Access</option>
+                    <option value="Email">Email</option>
+                    <option value="Printer">Printer</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <div id="ticket-list" class="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                <div class="text-center py-10">
+                    <p class="text-zinc-600 text-xs">Loading tickets...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: AGENT PANEL -->
+        <div>
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="text-sm font-black uppercase tracking-widest">Agent Panel</h2>
+                    <p class="text-[10px] text-zinc-600 mt-0.5">Click an agent to assign the selected ticket</p>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="flex gap-4 mb-3">
+                <span class="flex items-center gap-1.5 text-[10px] text-zinc-500"><span class="w-2 h-2 rounded-full dot-online inline-block"></span> Online</span>
+                <span class="flex items-center gap-1.5 text-[10px] text-zinc-500"><span class="w-2 h-2 rounded-full dot-away inline-block"></span> Away</span>
+                <span class="flex items-center gap-1.5 text-[10px] text-zinc-500"><span class="w-2 h-2 rounded-full dot-busy inline-block"></span> Busy</span>
+            </div>
+
+            <div id="agent-list" class="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                <div class="text-center py-10">
+                    <p class="text-zinc-600 text-xs">Loading agents...</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+    let allTickets = [];
+    let allAgents  = [];
+    let selectedTicketId = null;
+
+    // ── Load data ──────────────────────────────────────────────────────────────
+    async function loadData() {
+        try {
+            const res  = await fetch('/api/assignment_queue');
+            const data = await res.json();
+
+            allTickets = data.unassigned_tickets || [];
+            allAgents  = data.agents             || [];
+            const s    = data.summary            || {};
+
+            document.getElementById('stat-unassigned').textContent = s.total_unassigned   ?? '—';
+            document.getElementById('stat-pending').textContent    = s.pending_acceptance ?? '—';
+            document.getElementById('stat-online').textContent     = s.agents_online      ?? '—';
+            document.getElementById('stat-offline').textContent    = ((s.agents_away ?? 0) + (s.agents_busy ?? 0)) || '0';
+
+            applyFilters();
+            renderAgents(allAgents);
+        } catch(e) {
+            showToast('Failed to load data', 'error');
+        }
+    }
+
+    // ── Filters ────────────────────────────────────────────────────────────────
+    const PRIORITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+
+    function applyFilters() {
+        const priority = document.getElementById('filter-priority').value;
+        const category = document.getElementById('filter-category').value;
+        let filtered   = allTickets;
+        if (priority) filtered = filtered.filter(t => t.Priority === priority);
+        if (category) filtered = filtered.filter(t => t.Category === category);
+
+        // Sort: newest first, then by priority within same arrival time bucket
+        filtered = [...filtered].sort((a, b) => {
+            const aNew = isNewTicket(a.Created_Date);
+            const bNew = isNewTicket(b.Created_Date);
+            // New tickets always float to top
+            if (aNew !== bNew) return aNew ? -1 : 1;
+            // Within the same bucket sort by created date descending (newest first)
+            const aTime = a.Created_Date ? new Date(a.Created_Date).getTime() : 0;
+            const bTime = b.Created_Date ? new Date(b.Created_Date).getTime() : 0;
+            if (bTime !== aTime) return bTime - aTime;
+            // Tiebreak by priority
+            return (PRIORITY_ORDER[a.Priority] ?? 3) - (PRIORITY_ORDER[b.Priority] ?? 3);
+        });
+
+        renderTickets(filtered);
+    }
+
+    // ── Render tickets ─────────────────────────────────────────────────────────
+    function isNewTicket(createdDate) {
+        if (!createdDate) return false;
+        try {
+            const created = new Date(createdDate);
+            return (Date.now() - created.getTime()) < 30 * 60 * 1000; // 30 minutes
+        } catch(e) { return false; }
+    }
+
+    function renderTickets(tickets) {
+        const list = document.getElementById('ticket-list');
+        if (!tickets.length) {
+            list.innerHTML = `
+                <div class="text-center py-16">
+                    <div class="text-4xl mb-3">🎉</div>
+                    <p class="text-zinc-500 text-sm font-bold">No tickets awaiting assignment</p>
+                    <p class="text-zinc-700 text-xs mt-1">All tickets are assigned or resolved</p>
+                </div>`;
+            return;
+        }
+
+        // Count new tickets for header label
+        const newCount = tickets.filter(t => isNewTicket(t.Created_Date)).length;
+        const header   = document.getElementById('queue-new-count');
+        if (header) {
+            header.textContent = newCount > 0 ? `${newCount} new` : '';
+            header.className   = newCount > 0 ? 'text-[9px] font-bold text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 px-2 py-0.5 rounded-full' : 'hidden';
+        }
+
+        list.innerHTML = tickets.map(t => {
+            const slaColor = t.SLA_Status === 'breached'    ? '#f87171'
+                           : t.SLA_Status === 'near_breach' ? '#facc15'
+                           : '#4ade80';
+            const slaBarColor = t.SLA_Status === 'breached'    ? '#ef4444'
+                              : t.SLA_Status === 'near_breach' ? '#eab308'
+                              : '#22c55e';
+            const slaPct     = Math.min(t.SLA_Pct || 0, 100);
+            const slaLabel   = formatSlaRemaining(t.SLA_Remaining_Seconds, t.SLA_Status);
+            const desc       = esc(t.Description || '').substring(0, 80) + (t.Description && t.Description.length > 80 ? '...' : '');
+            const isSelected = t.Ticket_ID === selectedTicketId;
+            const isNew      = isNewTicket(t.Created_Date);
+            return `
+            <div class="ticket-row ${isSelected ? 'selected' : isNew ? 'is-new' : ''}"
+                 onclick="selectTicket('${esc(t.Ticket_ID)}', '${esc(t.Description || '')}')">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <span class="font-mono text-xs font-black text-blue-400">${esc(t.Ticket_ID)}</span>
+                            ${isNew ? '<span class="new-badge">NEW</span>' : ''}
+                            <span class="text-[9px] px-2 py-0.5 rounded-full font-bold badge-${t.Priority || 'Low'}">${t.Priority || 'Low'}</span>
+                            <span class="text-[9px] text-zinc-600 font-mono">${esc(t.Category || 'Other')}</span>
+                        </div>
+                        <p class="text-xs text-zinc-400 leading-relaxed mb-2">${desc || '<span class="text-zinc-700">No description</span>'}</p>
+                        <div class="flex items-center gap-3">
+                            <div class="sla-bar-track flex-1">
+                                <div class="sla-bar-fill" style="width:${slaPct}%;background:${slaBarColor}"></div>
+                            </div>
+                            <span class="text-[9px] font-mono font-bold whitespace-nowrap" style="color:${slaColor}">${slaLabel}</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-1 shrink-0">
+                        <span class="text-[9px] text-zinc-700">${esc(t.Created_Date || '')}</span>
+                        <button onclick="event.stopPropagation(); autoAssignOne('${esc(t.Ticket_ID)}')"
+                                class="text-[9px] bg-zinc-800 hover:bg-zinc-700 px-2 py-1 rounded-lg font-bold transition-all active:scale-95 whitespace-nowrap">
+                            ⚡ Auto
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // ── Render agents ──────────────────────────────────────────────────────────
+    function renderAgents(agents) {
+        const list = document.getElementById('agent-list');
+        if (!agents.length) {
+            list.innerHTML = `<div class="text-center py-16"><p class="text-zinc-600 text-xs">No agents found</p></div>`;
+            return;
+        }
+        list.innerHTML = agents.map(a => {
+            const dotClass     = `dot-${a.availability}`;
+            const isAvailable  = a.availability === 'online' && a.current_workload < a.max_workload;
+            const wlColor      = a.capacity_pct >= 90 ? '#ef4444' : a.capacity_pct >= 70 ? '#eab308' : '#22c55e';
+            const skillChips   = (a.skills || []).map(s => `<span class="skill-chip">${esc(s)}</span>`).join('');
+            const capacityLeft = a.max_workload - a.current_workload;
+            return `
+            <div class="agent-card ${isAvailable ? 'available' : ''}"
+                 onclick="${isAvailable ? `assignToAgent('${esc(a.email)}', '${esc(a.name)}')` : ''}">
+                <div class="flex items-start gap-3">
+                    <div class="relative mt-0.5">
+                        <div class="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center text-sm font-black text-zinc-400">
+                            ${esc(a.name).charAt(0).toUpperCase()}
+                        </div>
+                        <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-950 ${dotClass}"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <div>
+                                <p class="text-xs font-bold leading-tight">${esc(a.name)}</p>
+                                <p class="text-[9px] text-zinc-600 font-mono truncate">${esc(a.email)}</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-[9px] font-bold capitalize" style="color:${a.availability==='online'?'#4ade80':a.availability==='away'?'#facc15':'#f87171'}">${a.availability}</p>
+                                <p class="text-[9px] text-zinc-600">${a.current_workload}/${a.max_workload} tickets</p>
+                            </div>
+                        </div>
+                        <!-- Workload bar -->
+                        <div class="flex items-center gap-2 mt-2 mb-1.5">
+                            <div class="wl-bar-track">
+                                <div class="wl-bar-fill" style="width:${a.capacity_pct}%;background:${wlColor}"></div>
+                            </div>
+                            <span class="text-[9px] font-mono text-zinc-600 whitespace-nowrap">${capacityLeft} free</span>
+                        </div>
+                        <!-- Skills -->
+                        ${skillChips ? `<div class="flex flex-wrap gap-1 mt-1">${skillChips}</div>` : '<p class="text-[9px] text-zinc-700 italic mt-1">No skills set</p>'}
+                    </div>
+                </div>
+                ${!isAvailable ? `
+                    <div class="mt-2 pt-2 border-t border-white/5">
+                        <p class="text-[9px] text-zinc-700 italic">
+                            ${a.availability !== 'online' ? 'Agent is ' + a.availability : 'Workload full'}
+                        </p>
+                    </div>` : ''}
+            </div>`;
+        }).join('');
+    }
+
+    // ── Ticket selection ───────────────────────────────────────────────────────
+    function selectTicket(ticketId, description) {
+        selectedTicketId = ticketId;
+        const banner = document.getElementById('selection-banner');
+        banner.classList.remove('hidden');
+        document.getElementById('banner-ticket-id').textContent  = ticketId;
+        document.getElementById('banner-ticket-desc').textContent = description ? description.substring(0, 120) + (description.length > 120 ? '...' : '') : '';
+        applyFilters(); // Re-render to highlight selection
+    }
+
+    function clearSelection() {
+        selectedTicketId = null;
+        document.getElementById('selection-banner').classList.add('hidden');
+        applyFilters();
+    }
+
+    // ── Assign to agent (manual) ───────────────────────────────────────────────
+    async function assignToAgent(agentEmail, agentName) {
+        if (!selectedTicketId) {
+            showToast('Select a ticket from the queue first', 'error');
+            return;
+        }
+        try {
+            const res  = await fetch(`/api/tickets/${encodeURIComponent(selectedTicketId)}/assign`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ agent_email: agentEmail })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`✓ ${selectedTicketId} assigned to ${agentName}`, 'success');
+                clearSelection();
+                await loadData();
+            } else {
+                showToast(data.error || 'Assignment failed', 'error');
+            }
+        } catch(e) {
+            showToast('Network error', 'error');
+        }
+    }
+
+    // ── Auto-assign one ticket ─────────────────────────────────────────────────
+    async function autoAssignOne(ticketId) {
+        try {
+            const res  = await fetch(`/api/auto_assign/${encodeURIComponent(ticketId)}`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`⚡ ${ticketId} auto-assigned to ${data.assigned_to}`, 'success');
+                if (selectedTicketId === ticketId) clearSelection();
+                await loadData();
+            } else {
+                showToast(data.error || 'No available agent found', 'error');
+            }
+        } catch(e) {
+            showToast('Network error', 'error');
+        }
+    }
+
+    // ── Auto-assign selected ticket ────────────────────────────────────────────
+    async function autoAssignSelected() {
+        if (!selectedTicketId) {
+            showToast('No ticket selected', 'error');
+            return;
+        }
+        await autoAssignOne(selectedTicketId);
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function formatSlaRemaining(seconds, status) {
+        if (seconds === null || seconds === undefined) return 'N/A';
+        if (status === 'breached') {
+            const over = Math.abs(seconds);
+            const h    = Math.floor(over / 3600);
+            const m    = Math.floor((over % 3600) / 60);
+            return `BREACHED +${h}h${m}m`;
+        }
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        if (h > 24) return `${Math.floor(h/24)}d ${h%24}h left`;
+        return `${h}h ${m}m left`;
+    }
+
+    function esc(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function showToast(msg, type) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className   = `toast ${type}`;
+        setTimeout(() => t.classList.add('show'), 10);
+        setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    loadData();
+    setInterval(loadData, 10000); // Auto-refresh every 10s
+</script>
+</body>
+</html>

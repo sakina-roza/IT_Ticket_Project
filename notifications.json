@@ -1,0 +1,462 @@
+{
+  "Agent_A@gmail.com": [
+    {
+      "id": "1d5da76e-8d7c-42ff-a863-71a0b966d6ac",
+      "message": "Ticket TKT0014 assigned to you: Network (Critical)",
+      "ticket_id": "TKT0014",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:40"
+    },
+    {
+      "id": "30ac1e2e-1479-4002-b215-604279f9fe16",
+      "message": "Ticket TKT0046 assigned to you: Security (Critical)",
+      "ticket_id": "TKT0046",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:40"
+    },
+    {
+      "id": "42fde631-3477-471f-86e5-a2157647c8e4",
+      "message": "Ticket TKT0155 assigned to you: Hardware (Critical)",
+      "ticket_id": "TKT0155",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:40"
+    },
+    {
+      "id": "fc8fcfd7-a508-4a63-b592-53575727cf2f",
+      "message": "Ticket TKT0136 assigned to you: Software (Critical)",
+      "ticket_id": "TKT0136",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:40"
+    },
+    {
+      "id": "c5e08d5a-8c79-4061-8dd5-a2ec199ed270",
+      "message": "New ticket TKT-20260402-5756 auto-assigned to you: Printer (Medium)",
+      "ticket_id": "TKT-20260402-5756",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:51"
+    },
+    {
+      "id": "5a5c9d8c-e8c6-4716-ab15-dfe668520679",
+      "message": "New ticket TKT-20260402-1499 auto-assigned to you: Printer (Medium)",
+      "ticket_id": "TKT-20260402-1499",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:51"
+    },
+    {
+      "id": "b7c4fe69-940a-4837-b8f2-923091840066",
+      "message": "New ticket TKT-20260402-6653 auto-assigned to you: Printer (Medium)",
+      "ticket_id": "TKT-20260402-6653",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:51"
+    },
+    {
+      "id": "3f815e1a-2505-40f8-ac89-ca393e158819",
+      "message": "New ticket TKT-20260402-9102 auto-assigned to you: Printer (Medium)",
+      "ticket_id": "TKT-20260402-9102",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:51"
+    },
+    {
+      "id": "6f5aedb7-3a45-4edb-82a1-c4715da92082",
+      "message": "New ticket TKT-20260402-3073 auto-assigned to you: Printer (Medium)",
+      "ticket_id": "TKT-20260402-3073",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:51"
+    },
+    {
+      "id": "17d9e122-9ff1-4126-b425-3ad7276f9eb0",
+      "message": "New ticket TKT-20260402-1239 auto-assigned to you: Printer (Medium)",
+      "ticket_id": "TKT-20260402-1239",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:51"
+    },
+    {
+      "id": "7b9aff55-a59f-4ff6-8b02-d4ed50ef1819",
+      "message": "New ticket TKT-20260402-2009 auto-assigned to you: Printer (Medium)",
+      "ticket_id": "TKT-20260402-2009",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 16:51"
+    },
+    {
+      "id": "1ebf511e-05bb-44e0-b2e9-debe71f00a34",
+      "message": "Ticket TKT0096 assigned to you: Software (Critical)",
+      "ticket_id": "TKT0096",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 17:11"
+    }
+  ],
+  "nan": [
+    {
+      "id": "b1cf121f-8055-4741-a813-e0b086da6a57",
+      "message": "Ticket TKT0014 updated: Status: In Progress → Closed",
+      "ticket_id": "TKT0014",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 16:47"
+    },
+    {
+      "id": "7fd8cee8-751b-4755-9f65-d793bc906536",
+      "message": "Ticket TKT0014 updated: Status: Closed → In Progress",
+      "ticket_id": "TKT0014",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 16:47"
+    },
+    {
+      "id": "fc5ea49c-fe2e-47fb-a002-39a9d8d86326",
+      "message": "Ticket TKT0014 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0014",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 16:48"
+    },
+    {
+      "id": "39e9c7f0-2558-4dec-9219-cb48baf4e070",
+      "message": "Ticket TKT0014 updated: Status: Resolved → In Progress",
+      "ticket_id": "TKT0014",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:02"
+    },
+    {
+      "id": "6a2d2c08-f48d-4ab2-ab49-bec28896cc3a",
+      "message": "Ticket TKT0014 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0014",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:05"
+    },
+    {
+      "id": "6dfd92a2-5aad-4854-8b92-e12d76c173d8",
+      "message": "Ticket TKT0014 updated: Status: Resolved → In Progress",
+      "ticket_id": "TKT0014",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:05"
+    },
+    {
+      "id": "13023665-3eb2-47f5-8d12-c3ef63315b18",
+      "message": "Ticket TKT0014 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0014",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:05"
+    },
+    {
+      "id": "92bb4e1c-8813-4210-ae43-47e13768f97f",
+      "message": "Ticket TKT0014 updated: Status: Resolved → In Progress",
+      "ticket_id": "TKT0014",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:05"
+    },
+    {
+      "id": "4a64bacc-2bbd-46e8-a26e-1a2ab889bf4f",
+      "message": "Ticket TKT0014 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0014",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:05"
+    },
+    {
+      "id": "1b7b9836-853a-4b22-88da-f4ed394b926e",
+      "message": "Ticket TKT0046 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0046",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:06"
+    },
+    {
+      "id": "83a5775a-af83-4ab1-8d8d-aaa1f3969207",
+      "message": "Ticket TKT0136 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0136",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:06"
+    },
+    {
+      "id": "22b34cb1-f55a-4e67-9ee1-2dad15c9e5d8",
+      "message": "Ticket TKT0155 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0155",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:06"
+    },
+    {
+      "id": "6fdeb8b0-0ef3-45fa-9deb-48f828950b6d",
+      "message": "Ticket TKT0096 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0096",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:53"
+    },
+    {
+      "id": "809c3a6b-a2e7-4f55-9ec3-2b343e249e2f",
+      "message": "Ticket TKT0008 updated: Status: Closed → In Progress",
+      "ticket_id": "TKT0008",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:54"
+    },
+    {
+      "id": "3082fbf3-1c18-48f5-8f4d-6ae2334107a1",
+      "message": "Ticket TKT0008 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0008",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:54"
+    },
+    {
+      "id": "0d0ec559-c4ae-4834-9ce4-c42a5bbf4c1a",
+      "message": "Ticket TKT0008 updated: Status: Resolved → Closed",
+      "ticket_id": "TKT0008",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:54"
+    },
+    {
+      "id": "1c7000f1-ebae-4786-a768-d30436f75175",
+      "message": "Ticket TKT0008 updated: Status: Closed → In Progress",
+      "ticket_id": "TKT0008",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:55"
+    },
+    {
+      "id": "48ea6b77-b278-4f8d-82bd-3520f29db08f",
+      "message": "Ticket TKT0008 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0008",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:55"
+    },
+    {
+      "id": "4144ced4-e614-4571-9c6c-ad4054985129",
+      "message": "Ticket TKT0019 updated: Status: Closed → In Progress",
+      "ticket_id": "TKT0019",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:55"
+    },
+    {
+      "id": "a3bc1069-90bb-4a4c-91b2-2e18e9bf940e",
+      "message": "Ticket TKT0019 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT0019",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:55"
+    },
+    {
+      "id": "2a175dd6-511a-41ca-8018-c783ac9fa212",
+      "message": "Ticket TKT0001 updated: Status: Resolved → In Progress",
+      "ticket_id": "TKT0001",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-07 12:20"
+    },
+    {
+      "id": "8307e0ce-d042-4d3b-8ee7-0e9cb25e267f",
+      "message": "Ticket TKT0001 updated: Priority: Medium → Critical",
+      "ticket_id": "TKT0001",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-07 12:21"
+    },
+    {
+      "id": "6be85155-e9a5-40bc-a3a7-0ce88aaf0221",
+      "message": "Admin accepted ticket TKT0001",
+      "ticket_id": "TKT0001",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-07 12:22"
+    },
+    {
+      "id": "c866c218-af97-41b0-bc42-43de23cec273",
+      "message": "Ticket TKT0002 updated: Status: Open → Resolved; Priority: Low → Critical",
+      "ticket_id": "TKT0002",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-07 12:38"
+    }
+  ],
+  "admin@it.com": [
+    {
+      "id": "66c3364c-6d59-44bb-be3f-6ed07ed87686",
+      "message": "Ticket TKT-20260402-2009 transferred to you by agent_A",
+      "ticket_id": "TKT-20260402-2009",
+      "type": "new_ticket",
+      "read": true,
+      "time": "2026-04-02 17:03"
+    },
+    {
+      "id": "c161e68e-79ad-4587-a82e-17c23bf7e30e",
+      "message": "New ticket TKT-20260407-3487 needs manual assignment (no matching role): Network (High)",
+      "ticket_id": "TKT-20260407-3487",
+      "type": "new_ticket",
+      "read": true,
+      "time": "2026-04-07 12:20"
+    },
+    {
+      "id": "20113f21-a064-4b15-be2c-0b7994cfb55c",
+      "message": "New ticket TKT-20260407-2344 needs manual assignment (no matching role): Network (High)",
+      "ticket_id": "TKT-20260407-2344",
+      "type": "new_ticket",
+      "read": true,
+      "time": "2026-04-07 12:21"
+    },
+    {
+      "id": "a533de02-40e8-4fb7-9d87-fc10c5314f8d",
+      "message": "Your ticket TKT-20260407-2344 was automatically merged into TKT-20260407-3365 as a duplicate.",
+      "ticket_id": "TKT-20260407-3365",
+      "type": "update",
+      "read": true,
+      "time": "2026-04-07 12:21"
+    },
+    {
+      "id": "bca11e9c-7478-4291-b81b-c353cac8e85a",
+      "message": "Ticket TKT-20260407-3365 absorbed 1 duplicate ticket(s) automatically.",
+      "ticket_id": "TKT-20260407-3365",
+      "type": "update",
+      "read": true,
+      "time": "2026-04-07 12:21"
+    },
+    {
+      "id": "96ec53ad-0a6f-4249-a859-15360c3014cb",
+      "message": "Auto-merged 1 duplicate(s) into TKT-20260407-3365",
+      "ticket_id": "TKT-20260407-3365",
+      "type": "info",
+      "read": true,
+      "time": "2026-04-07 12:21"
+    },
+    {
+      "id": "599500b0-ff0b-4676-9a05-7cfbacef5c5e",
+      "message": "New ticket TKT-20260407-2334 needs manual assignment (no matching role): Email (Low)",
+      "ticket_id": "TKT-20260407-2334",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-07 12:38"
+    }
+  ],
+  "malekaroza8765@gmail.com": [
+    {
+      "id": "35666c8c-67cb-4d50-b72d-ce7617e3eac5",
+      "message": "Ticket TKT-20260402-5756 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT-20260402-5756",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:06"
+    },
+    {
+      "id": "547f37df-439f-4ec6-99f8-27e9c8419b07",
+      "message": "Ticket TKT-20260402-5756 updated: Status: Resolved → In Progress",
+      "ticket_id": "TKT-20260402-5756",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:06"
+    },
+    {
+      "id": "1e53eaf2-f5a6-4c51-b151-f71a42084101",
+      "message": "Ticket TKT-20260402-5756 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT-20260402-5756",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:06"
+    },
+    {
+      "id": "6b130d63-fd0b-4645-93b3-6750b2248dd2",
+      "message": "Ticket TKT-20260402-1499 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT-20260402-1499",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:06"
+    },
+    {
+      "id": "f16e3c6c-3995-4de3-a27c-c26bcedc6620",
+      "message": "Ticket TKT-20260402-6653 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT-20260402-6653",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:06"
+    },
+    {
+      "id": "79f5e289-627b-4048-9143-288ec7236a2e",
+      "message": "Ticket TKT-20260402-9102 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT-20260402-9102",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:07"
+    },
+    {
+      "id": "6f2f4655-68a6-4f5f-8341-3f40566f403f",
+      "message": "Ticket TKT-20260402-3073 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT-20260402-3073",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:07"
+    },
+    {
+      "id": "1324c874-25c6-499b-bd38-c5f9944776f2",
+      "message": "Ticket TKT-20260402-1239 updated: Status: In Progress → Resolved",
+      "ticket_id": "TKT-20260402-1239",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:07"
+    },
+    {
+      "id": "3cb02245-b027-419a-9eea-1ec368270b5f",
+      "message": "Ticket TKT-20260402-2009 updated: Status: In Progress → Closed",
+      "ticket_id": "TKT-20260402-2009",
+      "type": "update",
+      "read": false,
+      "time": "2026-04-02 17:20"
+    }
+  ],
+  "agent.dana@it.com": [
+    {
+      "id": "cfed0f20-18c9-4c91-a50c-8e719a5bc0f6",
+      "message": "Ticket TKT-20260402-8156 auto-assigned to you by role: Network (Low). Accept or Decline.",
+      "ticket_id": "TKT-20260402-8156",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-02 18:07"
+    },
+    {
+      "id": "212c8ad3-b88a-4280-9de9-032056748b1f",
+      "message": "Ticket TKT-20260407-3365 auto-assigned to you by role: Network (High). Accept or Decline.",
+      "ticket_id": "TKT-20260407-3365",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-07 11:34"
+    },
+    {
+      "id": "f31ad5c5-de95-4b04-b6e7-7f21ed8dec3c",
+      "message": "Ticket TKT-20260407-6577 auto-assigned to you by role: Network (High). Accept or Decline.",
+      "ticket_id": "TKT-20260407-6577",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-07 11:35"
+    }
+  ],
+  "agent.alex@it.com": [
+    {
+      "id": "04d6e087-e25b-4da0-b991-d05f092e17ec",
+      "message": "Ticket TKT0001 transferred to you by Admin",
+      "ticket_id": "TKT0001",
+      "type": "new_ticket",
+      "read": false,
+      "time": "2026-04-07 12:22"
+    }
+  ]
+}

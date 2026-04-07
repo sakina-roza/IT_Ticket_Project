@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #050505; color: white; font-family: sans-serif; }
+        body { background: #000000; color: white; font-family: sans-serif; }
         .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); }
         .progress-bar { height: 4px; background: #18181b; border-radius: 9999px; overflow: hidden; }
         .progress-fill { height: 100%; border-radius: 9999px; transition: width 1s ease; }
@@ -61,7 +61,7 @@
         'Resolved':    { color: 'text-green-400',  bar: '#22c55e', bg: 'border-green-600/30' },
         'Closed':      { color: 'text-zinc-400',   bar: '#52525b', bg: 'border-zinc-600/30' }
     };
-    const PRI_COLOR = { Critical:'text-red-400', High:'text-orange-400', Medium:'text-yellow-400', Low:'text-zinc-400' };
+    const PRI_COLOR = { Critical:'text-red-400', High:'text-red-400', Medium:'text-yellow-400', Low:'text-zinc-400' };
 
     async function load() {
         const res  = await fetch('/api/my_tickets');

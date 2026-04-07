@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #050505; color: white; font-family: sans-serif; }
+        body { background: #000000; color: white; font-family: sans-serif; }
         .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); backdrop-filter: blur(10px); }
         .comment-item { border-left: 2px solid #333; transition: border-color 0.2s; }
         .comment-item:hover { border-color: #dc2626; }
@@ -174,11 +174,11 @@
                         Assign to Me
                     </button>
                     <button onclick="escalateTicket()"
-                            class="w-full bg-orange-900/20 hover:bg-orange-900/40 border border-orange-600/20 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-orange-400 hover:text-orange-300 transition-all active:scale-95">
+                            class="w-full bg-orange-900/20 hover:bg-orange-900/40 border border-orange-600/20 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-red-400 hover:text-orange-300 transition-all active:scale-95">
                         Escalate to Critical
                     </button>
                     <button onclick="markInProgress()"
-                            class="w-full bg-blue-900/20 hover:bg-blue-900/40 border border-blue-600/20 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-blue-400 transition-all active:scale-95">
+                            class="w-full bg-blue-900/20 hover:bg-blue-900/40 border border-red-600/20 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-blue-400 transition-all active:scale-95">
                         Mark In Progress
                     </button>
                     {% if current_user and current_user.role in ('admin','agent') %}
@@ -227,7 +227,7 @@
 <!-- DECLINE MODAL -->
 <div id="decline-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
     <div class="glass rounded-[2rem] p-8 w-full max-w-md space-y-5">
-        <h3 class="text-sm font-black uppercase tracking-widest text-red-400">Decline &amp; Re-route</h3>
+        <h3 class="text-sm font-black uppercase tracking-widest text-blue-400">Decline &amp; Re-route</h3>
         <p class="text-[10px] text-zinc-500 uppercase">This ticket will be re-assigned to the next available agent.</p>
         <textarea id="decline-reason" class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm outline-none focus:border-red-600/40 min-h-[80px]" placeholder="Reason for declining (optional)..."></textarea>
         <div class="flex gap-3 justify-end">
@@ -384,7 +384,7 @@
             list.innerHTML = data.map(f => `
                 <div class="flex items-center gap-3 bg-zinc-900 p-3 rounded-xl">
                     <span class="text-lg">📎</span>
-                    <a href="${f.url}" target="_blank" class="text-xs text-zinc-300 hover:text-red-400 transition-colors flex-1 truncate">${f.filename}</a>
+                    <a href="${f.url}" target="_blank" class="text-xs text-zinc-300 hover:text-red-500 transition-colors flex-1 truncate">${f.filename}</a>
                     <a href="${f.url}" download class="text-[9px] text-zinc-600 hover:text-white uppercase font-bold transition-colors">Download</a>
                 </div>
             `).join('');

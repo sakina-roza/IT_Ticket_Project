@@ -6,7 +6,7 @@
     <title>Agent Queue — IT Helpdesk</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #050505; color: white; font-family: sans-serif; }
+        body { background: #000000; color: white; font-family: sans-serif; }
         .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); }
         select option { background: #111; }
         .toast { position:fixed; bottom:1.5rem; right:1.5rem; padding:0.75rem 1.25rem; border-radius:0.75rem;
@@ -16,6 +16,28 @@
         .toast.error   { background:rgba(220,38,38,0.15); border:1px solid rgba(220,38,38,0.4); color:#f87171; }
         body.light-mode { background: #f4f4f5; color: #18181b; }
         body.light-mode .glass { background: rgba(0,0,0,0.04); border-color: rgba(220,38,38,0.3); }
+
+        /* Pending assignment section */
+        .pending-card {
+            background: rgba(234,179,8,0.05);
+            border: 1px solid rgba(234,179,8,0.3);
+            border-radius: 1rem;
+            padding: 1rem;
+            transition: all 0.2s;
+        }
+        .pending-card:hover { background: rgba(234,179,8,0.09); }
+        .pulse-ring {
+            animation: pulse-ring 1.8s ease-out infinite;
+        }
+        @keyframes pulse-ring {
+            0%   { box-shadow: 0 0 0 0 rgba(234,179,8,0.5); }
+            70%  { box-shadow: 0 0 0 8px rgba(234,179,8,0); }
+            100% { box-shadow: 0 0 0 0 rgba(234,179,8,0); }
+        }
+        .badge-Critical { background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.4);color:#f87171; }
+        .badge-High     { background:rgba(234,88,12,0.15); border:1px solid rgba(234,88,12,0.4); color:#fb923c; }
+        .badge-Medium   { background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.4);color:#facc15; }
+        .badge-Low      { background:rgba(63,63,70,0.4);  border:1px solid rgba(113,113,122,0.4);color:#a1a1aa; }
     </style>
 </head>
 <body class="p-6">
@@ -42,13 +64,24 @@
                         🟡 Away
                     </button>
                     <button type="button" id="avail-busy" onclick="setAvailability('busy')"
-                            class="avail-btn px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all border border-zinc-800 text-zinc-600 hover:border-red-800 hover:text-red-400">
+                            class="avail-btn px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all border border-zinc-800 text-zinc-600 hover:border-red-800 hover:text-red-500">
                         🔴 Busy
                     </button>
                 </div>
             </div>
             <button type="button" onclick="loadQueue()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-all">↺ Refresh</button>
         </div>
+    </div>
+
+    <!-- PENDING ACCEPTANCE SECTION -->
+    <div id="pending-section" class="hidden mb-8">
+        <div class="flex items-center gap-3 mb-3">
+            <span class="pulse-ring w-3 h-3 rounded-full bg-yellow-400 inline-block"></span>
+            <h2 class="text-sm font-black uppercase tracking-widest text-yellow-400">Pending Acceptance</h2>
+            <span id="pending-count" class="text-[9px] bg-yellow-400/20 border border-yellow-400/30 text-yellow-300 font-bold px-2 py-0.5 rounded-full">0</span>
+            <p class="text-[10px] text-zinc-600 ml-1">Admin has assigned these tickets to you — please Accept or Decline</p>
+        </div>
+        <div id="pending-list" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
     </div>
 
     <!-- STATS -->
@@ -97,7 +130,7 @@
 
 <script>
     const SLA_COLOR = { on_track: 'text-green-400', near_breach: 'text-yellow-400', breached: 'text-red-400', unknown: 'text-zinc-600' };
-    const PRI_COLOR = { Critical: 'text-red-400', High: 'text-orange-400', Medium: 'text-yellow-400', Low: 'text-zinc-400' };
+    const PRI_COLOR = { Critical: 'text-red-400', High: 'text-red-400', Medium: 'text-yellow-400', Low: 'text-zinc-400' };
 
     // Live countdown state: ticketId → remaining seconds at last load
     const slaTimers = {};  // ticketId → { remaining, loadedAt }
@@ -208,27 +241,91 @@
             const tbody = document.getElementById('queue-body');
             const empty = document.getElementById('queue-empty');
 
-            document.getElementById('q-total').innerText      = data.length;
-            document.getElementById('q-open').innerText       = data.filter(t => t.Status === 'Open').length;
-            document.getElementById('q-inprogress').innerText = data.filter(t => t.Status === 'In Progress').length;
-            document.getElementById('q-resolved').innerText   = data.filter(t => ['Resolved','Closed'].includes(t.Status)).length;
+            // Split: pending (Open = awaiting acceptance) vs active
+            const pending = data.filter(t => t.Status === 'Open');
+            const active  = data.filter(t => t.Status !== 'Open');
 
-            if (!data.length) {
+            document.getElementById('q-total').innerText      = data.length;
+            document.getElementById('q-open').innerText       = pending.length;
+            document.getElementById('q-inprogress').innerText = active.filter(t => t.Status === 'In Progress').length;
+            document.getElementById('q-resolved').innerText   = active.filter(t => ['Resolved','Closed'].includes(t.Status)).length;
+
+            // ── Pending section ──────────────────────────────────────────────
+            const pendingSection = document.getElementById('pending-section');
+            const pendingList    = document.getElementById('pending-list');
+            const pendingCount   = document.getElementById('pending-count');
+
+            if (pending.length > 0) {
+                pendingSection.classList.remove('hidden');
+                pendingCount.textContent = pending.length;
+                pendingList.innerHTML = pending.map(t => {
+                    const hasTimer = t.SLA_Remaining_Seconds !== null && t.SLA_Remaining_Seconds !== undefined;
+                    const slaHtml  = hasTimer
+                        ? `<span data-sla-timer data-sla-tid="${t.Ticket_ID}">${fmtCountdown(t.SLA_Remaining_Seconds)}</span>`
+                        : `<span class="text-zinc-600 text-[10px]">⚪ N/A</span>`;
+                    const desc = (t.Description || '').substring(0, 100) + (t.Description && t.Description.length > 100 ? '…' : '');
+                    return `
+                    <div class="pending-card">
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <a href="/tickets/${t.Ticket_ID}" class="font-mono text-xs font-black text-yellow-300 hover:text-yellow-200 transition-colors">${t.Ticket_ID}</a>
+                                    <span class="text-[9px] px-2 py-0.5 rounded-full font-bold badge-${t.Priority || 'Low'}">${t.Priority || 'Low'}</span>
+                                    <span class="text-[9px] text-zinc-500">${t.Category || 'Other'}</span>
+                                </div>
+                                <p class="text-[10px] text-zinc-500 mt-1 leading-relaxed">${desc || 'No description'}</p>
+                            </div>
+                            <div class="text-right shrink-0 text-[9px] text-zinc-600">${String(t.Created_Date || '').substring(0,10)}</div>
+                        </div>
+                        <div class="flex items-center gap-2 mb-3">
+                            ${slaHtml}
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="acceptTicket('${t.Ticket_ID}')"
+                                    class="flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95
+                                           bg-green-600 hover:bg-green-500 text-white">
+                                ✔ Accept
+                            </button>
+                            <button onclick="openQueueDecline('${t.Ticket_ID}')"
+                                    class="flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95
+                                           bg-red-900/40 hover:bg-red-900/70 border border-red-600/40 text-blue-400">
+                                ✖ Decline
+                            </button>
+                            <a href="/tickets/${t.Ticket_ID}"
+                               class="px-4 py-2 rounded-xl text-[10px] font-bold uppercase bg-zinc-800 hover:bg-zinc-700 transition-all whitespace-nowrap">
+                                View
+                            </a>
+                        </div>
+                    </div>`;
+                }).join('');
+                // Register SLA timers for pending
+                const loadedAt = Date.now();
+                pending.forEach(t => {
+                    if (t.SLA_Remaining_Seconds !== null && t.SLA_Remaining_Seconds !== undefined) {
+                        slaTimers[t.Ticket_ID] = { remaining: t.SLA_Remaining_Seconds, loadedAt };
+                    }
+                });
+            } else {
+                pendingSection.classList.add('hidden');
+            }
+
+            // ── Active queue table ───────────────────────────────────────────
+            if (!active.length) {
                 tbody.innerHTML = '';
-                empty.classList.remove('hidden');
+                if (!pending.length) empty.classList.remove('hidden');
+                else empty.classList.add('hidden');
                 return;
             }
             empty.classList.add('hidden');
 
-            // Register SLA timer state
             const loadedAt = Date.now();
-            data.forEach(t => {
+            active.forEach(t => {
                 if (t.SLA_Remaining_Seconds !== null && t.SLA_Remaining_Seconds !== undefined) {
                     slaTimers[t.Ticket_ID] = { remaining: t.SLA_Remaining_Seconds, loadedAt };
                 }
             });
 
-            tbody.innerHTML = data.map(t => {
+            tbody.innerHTML = active.map(t => {
                 const priClass = PRI_COLOR[t.Priority] || 'text-white';
                 const hasTimer = t.SLA_Remaining_Seconds !== null && t.SLA_Remaining_Seconds !== undefined;
                 const slaCell  = hasTimer
@@ -244,11 +341,7 @@
                         <td class="p-4">${slaCell}</td>
                         <td class="p-4 text-right">
                             <div class="flex gap-2 justify-end flex-wrap">
-                                ${t.Status === 'Open' ? `
-                                    <button onclick="acceptTicket('${t.Ticket_ID}')" class="text-[9px] bg-green-900/30 hover:bg-green-900/60 border border-green-600/30 px-3 py-1.5 rounded-lg font-bold uppercase text-green-400 transition-all">✔ Accept</button>
-                                    <button onclick="openQueueDecline('${t.Ticket_ID}')" class="text-[9px] bg-red-900/20 hover:bg-red-900/40 border border-red-600/20 px-3 py-1.5 rounded-lg font-bold uppercase text-red-400 transition-all">✖ Decline</button>
-                                ` : ''}
-                                ${t.Status === 'In Progress' ? '' : t.Status !== 'Open' ? `<button onclick="updateStatus('${t.Ticket_ID}','In Progress')" class="text-[9px] bg-blue-900/30 hover:bg-blue-900/60 border border-blue-600/20 px-3 py-1.5 rounded-lg font-bold uppercase transition-all">In Progress</button>` : ''}
+                                ${t.Status === 'In Progress' ? '' : `<button onclick="updateStatus('${t.Ticket_ID}','In Progress')" class="text-[9px] bg-blue-900/30 hover:bg-blue-900/60 border border-red-600/20 px-3 py-1.5 rounded-lg font-bold uppercase transition-all">In Progress</button>`}
                                 ${!['Resolved','Closed'].includes(t.Status) ? `<button onclick="updateStatus('${t.Ticket_ID}','Resolved')" class="text-[9px] bg-green-900/30 hover:bg-green-900/60 border border-green-600/20 px-3 py-1.5 rounded-lg font-bold uppercase text-green-400 transition-all">Resolve</button>` : ''}
                                 <a href="/tickets/${t.Ticket_ID}" class="text-[9px] bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg font-bold uppercase transition-all">View</a>
                             </div>
@@ -302,7 +395,7 @@
 <!-- DECLINE MODAL (queue) -->
 <div id="q-decline-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
     <div class="glass rounded-[2rem] p-8 w-full max-w-md space-y-5">
-        <h3 class="text-sm font-black uppercase tracking-widest text-red-400">Decline &amp; Re-route</h3>
+        <h3 class="text-sm font-black uppercase tracking-widest text-blue-400">Decline &amp; Re-route</h3>
         <p class="text-[10px] text-zinc-500 uppercase">This ticket will be re-assigned to the next available agent.</p>
         <textarea id="q-decline-reason" class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm outline-none focus:border-red-600/40 min-h-[80px]" placeholder="Reason for declining (optional)..."></textarea>
         <div class="flex gap-3 justify-end">

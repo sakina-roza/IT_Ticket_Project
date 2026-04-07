@@ -5,7 +5,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
-        body { background: #050505; color: white; font-family: sans-serif; }
+        body { background: #000000; color: white; font-family: sans-serif; }
         .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); backdrop-filter: blur(10px); }
         body.light-mode { background: #f4f4f5; color: #18181b; }
         body.light-mode .glass { background: rgba(0,0,0,0.03); border-color: rgba(220,38,38,0.3); }
@@ -49,7 +49,7 @@
             <div class="grid grid-cols-3 gap-2 mt-4 text-center">
                 <div><p class="text-[9px] text-green-500 uppercase">On Track</p><p id="sla-ok-count" class="font-bold text-green-400">--</p></div>
                 <div><p class="text-[9px] text-yellow-500 uppercase">Near</p><p id="sla-near-count" class="font-bold text-yellow-400">--</p></div>
-                <div><p class="text-[9px] text-red-500 uppercase">Breached</p><p id="sla-breach-count" class="font-bold text-red-400">--</p></div>
+                <div><p class="text-[9px] text-red-500 uppercase">Breached</p><p id="sla-breach-count" class="font-bold text-blue-400">--</p></div>
             </div>
         </div>
 
@@ -242,7 +242,7 @@
             tbody.innerHTML = data.map(a => `
                 <tr class="border-b border-white/5 hover:bg-white/5">
                     <td class="py-3"><a href="/tickets/${a.ticket_id}" class="font-mono font-bold hover:text-red-500 transition-colors">${a.ticket_id}</a></td>
-                    <td class="py-3 ${a.priority==='Critical'?'text-red-400':a.priority==='High'?'text-orange-400':'text-yellow-400'} font-bold">${a.priority}</td>
+                    <td class="py-3 ${a.priority==='Critical'?'text-red-400':a.priority==='High'?'text-red-400':'text-yellow-400'} font-bold">${a.priority}</td>
                     <td class="py-3 text-zinc-400">${a.category}</td>
                     <td class="py-3 text-zinc-400">${a.assigned_to}</td>
                     <td class="py-3 text-center font-mono">${a.elapsed_hours}h</td>

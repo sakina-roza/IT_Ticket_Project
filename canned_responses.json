@@ -1,0 +1,27 @@
+[
+  {
+    "id": "cr1",
+    "label": "Acknowledge",
+    "body": "Thank you for reaching out. I've picked up your ticket and will begin investigating shortly."
+  },
+  {
+    "id": "cr2",
+    "label": "Need More Info",
+    "body": "Could you please provide more details? Specifically: when did it start, what steps you've already tried, and any error messages you're seeing."
+  },
+  {
+    "id": "cr3",
+    "label": "Resolved",
+    "body": "I'm happy to let you know your issue has been resolved. Please reopen the ticket if you experience any further problems."
+  },
+  {
+    "id": "cr4",
+    "label": "Escalating",
+    "body": "Your ticket is being escalated to a senior technician for further investigation. We'll keep you updated on progress."
+  },
+  {
+    "id": "cr5",
+    "label": "Scheduled Maintenance",
+    "body": "This issue is related to scheduled maintenance. Normal service will be restored shortly. Apologies for the inconvenience."
+  }
+]

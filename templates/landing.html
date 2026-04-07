@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IT Command Center</title>
+    <title>IT ticket analysis  TicketMitra   </title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -40,20 +40,20 @@
             pointer-events: none;
         }
 
-        /* ── Red grid ── */
+        /* ── Blue grid ── */
         .grid-bg {
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
             background-image:
-                linear-gradient(rgba(220,38,38,0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(220,38,38,0.04) 1px, transparent 1px);
+                linear-gradient(rgba(220,38,38,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(220,38,38,0.05) 1px, transparent 1px);
             background-size: 60px 60px;
             z-index: 0;
             animation: gridPulse 4s ease-in-out infinite;
         }
         @keyframes gridPulse {
-            0%, 100% { opacity: 0.5; }
+            0%, 100% { opacity: 0.4; }
             50%       { opacity: 1; }
         }
 
@@ -90,8 +90,8 @@
             animation: bootFade 0.15s ease forwards;
             letter-spacing: 0.05em;
         }
-        .boot-line.green { color: #22c55e; }
-        .boot-line.dim   { color: #3f3f46; }
+        .boot-line.orange { color: #ef4444; }
+        .boot-line.dim    { color: #3f3f46; }
         @keyframes bootFade {
             to { opacity: 1; }
         }
@@ -126,14 +126,15 @@
         }
 
         .main-title {
-            font-size: clamp(3rem, 8vw, 7rem);
+            font-size: clamp(2rem, 5.5vw, 5rem);
             font-weight: 900;
             font-style: italic;
-            line-height: 1;
+            line-height: 1.05;
             letter-spacing: -0.02em;
             position: relative;
         }
-        .main-title .red { color: #dc2626; }
+        .main-title .blue   { color: #ffffff; }
+        .main-title .orange { color: #dc2626; }
 
         /* Glitch */
         .glitch {
@@ -197,10 +198,12 @@
         .stat-num {
             font-size: 1.8rem;
             font-weight: 900;
-            color: #dc2626;
             display: block;
             font-style: italic;
         }
+        .stat-num.blue   { color: #ffffff; }
+        .stat-num.orange { color: #dc2626; }
+        .stat-num.white  { color: #e4e4e7; }
         .stat-lbl {
             font-size: 0.55rem;
             color: #3f3f46;
@@ -244,7 +247,8 @@
             border-radius: 999px;
             position: relative;
             overflow: hidden;
-            transition: background 0.2s;
+            transition: background 0.2s, box-shadow 0.2s;
+            box-shadow: 0 0 24px rgba(220,38,38,0.4);
         }
         .enter-btn a::before {
             content: '';
@@ -252,14 +256,16 @@
             inset: 0;
             background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
         }
-        .enter-btn a:hover { background: #b91c1c; }
+        .enter-btn a:hover {
+            background: #b91c1c;
+            box-shadow: 0 0 28px rgba(220,38,38,0.6);
+        }
         .enter-btn a .arrow {
             display: inline-block;
             transition: transform 0.3s;
         }
         .enter-btn a:hover .arrow { transform: translateX(6px); }
 
-        /* Ripple on click */
         .enter-btn a:active::after {
             content: '';
             position: absolute;
@@ -355,24 +361,24 @@
         <div class="logo-wrap" id="logo">
             <div class="badge">● SYSTEM ONLINE — 2026</div>
             <h1 class="main-title">
-                <span class="glitch" data-text="IT">IT</span>
-                <span class="red"> COMMAND</span><br>
-                <span style="color:#18181b;">COMMAND </span><span class="glitch" data-text="CENTER">CENTER</span>
+                <span class="glitch" data-text="IT TICKET">IT <span class="orange">TICKET</span></span><br>
+                <span class="blue">SERVICE</span> <span class="orange">PERFORMANCE</span><br>
+                <span class="glitch" data-text="ANALYSIS">ANALYSIS</span>
             </h1>
             <p class="sub-title">Intelligent Ticket Management Platform</p>
         </div>
 
         <div class="stats-row" id="stats">
             <div class="stat-item">
-                <span class="stat-num" id="s1">0</span>
+                <span class="stat-num blue" id="s1">0</span>
                 <span class="stat-lbl">Tickets Tracked</span>
             </div>
             <div class="stat-item">
-                <span class="stat-num" id="s2">0%</span>
+                <span class="stat-num orange" id="s2">0%</span>
                 <span class="stat-lbl">SLA Compliance</span>
             </div>
             <div class="stat-item">
-                <span class="stat-num" id="s3">0h</span>
+                <span class="stat-num white" id="s3">0h</span>
                 <span class="stat-lbl">Avg Resolution</span>
             </div>
         </div>
@@ -381,7 +387,7 @@
 
         <div class="enter-btn" id="enter-btn">
             <a href="/login" onclick="goLogin(event)">
-                ENTER SYSTEM <span class="arrow">→</span>
+                ENTER SYSTEM <span class="arrow">&#8594;</span>
             </a>
         </div>
     </div>
@@ -398,8 +404,15 @@
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
+    // Mix of blue and orange particles matching the logo
+    const COLORS = [
+        'rgba(220,38,38,',    // red
+        'rgba(185,28,28,',    // dark red
+        'rgba(248,113,113,',  // light red
+        'rgba(255,255,255,',  // white
+    ];
     const particles = [];
-    const COUNT = 80;
+    const COUNT = 90;
 
     for (let i = 0; i < COUNT; i++) {
         particles.push({
@@ -408,33 +421,31 @@
             r: Math.random() * 1.5 + 0.3,
             dx: (Math.random() - 0.5) * 0.4,
             dy: (Math.random() - 0.5) * 0.4,
-            alpha: Math.random() * 0.5 + 0.1
+            alpha: Math.random() * 0.5 + 0.15,
+            color: COLORS[Math.floor(Math.random() * COLORS.length)]
         });
     }
 
     function drawParticles() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         particles.forEach(p => {
-            // Draw particle
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(220,38,38,${p.alpha})`;
+            ctx.fillStyle = `${p.color}${p.alpha})`;
             ctx.fill();
 
-            // Draw connections
             particles.forEach(q => {
                 const dist = Math.hypot(p.x - q.x, p.y - q.y);
                 if (dist < 120) {
                     ctx.beginPath();
                     ctx.moveTo(p.x, p.y);
                     ctx.lineTo(q.x, q.y);
-                    ctx.strokeStyle = `rgba(220,38,38,${0.06 * (1 - dist/120)})`;
+                    ctx.strokeStyle = `rgba(220,38,38,${0.07 * (1 - dist/120)})`;
                     ctx.lineWidth = 0.5;
                     ctx.stroke();
                 }
             });
 
-            // Move
             p.x += p.dx;
             p.y += p.dy;
             if (p.x < 0 || p.x > canvas.width)  p.dx *= -1;
@@ -451,17 +462,17 @@
 
     // ── Boot sequence ──
     const bootLines = [
-        { text: 'BIOS v4.2.1 — IT Command Systems Corp.', cls: 'dim' },
+        { text: 'TicketMitra v2.0 — IT Support Analysis Platform', cls: 'dim' },
         { text: 'Initializing hardware abstraction layer...', cls: 'dim' },
-        { text: 'Loading kernel modules.............. OK', cls: 'green' },
-        { text: 'Mounting encrypted data volume........ OK', cls: 'green' },
+        { text: 'Loading kernel modules.............. OK', cls: 'orange' },
+        { text: 'Mounting encrypted data volume........ OK', cls: 'orange' },
         { text: 'Starting Flask application server....', cls: '' },
-        { text: 'Connecting to Excel data source...... OK', cls: 'green' },
-        { text: 'Loading ticket database.............. OK', cls: 'green' },
-        { text: 'Running SLA engine................... OK', cls: 'green' },
-        { text: 'Starting notification service........ OK', cls: 'green' },
+        { text: 'Connecting to Excel data source...... OK', cls: 'orange' },
+        { text: 'Loading ticket database.............. OK', cls: 'orange' },
+        { text: 'Running SLA engine................... OK', cls: 'orange' },
+        { text: 'Starting notification service........ OK', cls: 'orange' },
         { text: '──────────────────────────────────────────', cls: 'dim' },
-        { text: '✓ ALL SYSTEMS NOMINAL — READY', cls: 'green' },
+        { text: '✓ ALL SYSTEMS NOMINAL — READY', cls: 'orange' },
     ];
 
     const bootEl = document.getElementById('boot-lines');
@@ -469,7 +480,6 @@
 
     function showNextLine() {
         if (lineIndex >= bootLines.length) {
-            // Fade out boot screen
             setTimeout(() => {
                 bootEl.style.opacity = '0';
                 setTimeout(() => {

@@ -68,14 +68,14 @@ def _read_json(path, default=None):
     if not os.path.exists(path):
         return default
     try:
-        with open(path) as f:
+        with open(path, encoding='utf-8') as f:
             return json.load(f)
     except Exception:
         return default
 
 def _write_json(path, data):
-    with open(path, 'w') as f:
-        json.dump(data, f, indent=2)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 # ── User helpers ───────────────────────────────────────────────────────────────
 
@@ -138,35 +138,31 @@ def _get_agent_workload(email):
 
 def _find_best_agent(category, priority):
     """
-    Skill-based, availability-aware, load-balanced agent selection.
-    Returns the best agent email or None.
-    Preference order:
-      1. Available agents whose skills include `category`, lowest workload first
-      2. Any available agent under max_workload, lowest workload first
+    Strict role-based, availability-aware, load-balanced agent selection.
+    Only assigns to an agent whose assigned roles include `category`.
+    Returns the matching agent email with the lowest workload, or None.
+    If no agent has a matching role the ticket goes to the manual queue.
     """
-    users = get_users()
-    available_agents = [
-        (email, u) for email, u in users.items()
-        if u.get('role') == 'agent'
-        and u.get('availability_status', 'online') == 'online'
-    ]
-    if not available_agents:
-        return None
-
+    users      = get_users()
     candidates = []
-    for email, u in available_agents:
-        workload  = _get_agent_workload(email)
-        max_wl    = u.get('max_workload', 10)
-        if workload >= max_wl:
+    for email, u in users.items():
+        if u.get('role') != 'agent':
             continue
-        has_skill = category in u.get('skills', [])
-        candidates.append((email, workload, has_skill))
+        if u.get('availability_status', 'online') != 'online':
+            continue
+        # Strict role check — must have the category in their assigned roles
+        if category not in u.get('skills', []):
+            continue
+        workload = _get_agent_workload(email)
+        if workload >= u.get('max_workload', 10):
+            continue
+        candidates.append((email, workload))
 
     if not candidates:
         return None
 
-    # Sort: skill match first (True > False in reverse), then by workload asc
-    candidates.sort(key=lambda x: (not x[2], x[1]))
+    # Lowest workload first
+    candidates.sort(key=lambda x: x[1])
     return candidates[0][0]
 
 # ── Context processor ──────────────────────────────────────────────────────────
@@ -195,6 +191,8 @@ def get_safe_data():
         for col in ('Created_By','Description','Last_Updated','Attachments'):
             if col not in df.columns:
                 df[col] = ''
+            else:
+                df[col] = df[col].astype(object).fillna('')
         return df
     except Exception as e:
         print(f"Excel Read Error: {e}")
@@ -299,7 +297,7 @@ def send_email_notification(to_email, subject, body_html):
     if not u.get('email_notifications', True):
         return
     if not MAIL_ENABLED:
-        print(f"[Email skipped - mail not configured]: {subject} → {to_email}")
+        print(f"[Email skipped - mail not configured]: {subject} -> {to_email}")
         return
     try:
         msg = MailMessage(subject, recipients=[to_email], html=body_html)
@@ -672,16 +670,15 @@ def submit_ticket():
     tid = generate_ticket_id()
     u   = current_user_info()
 
-    # Auto-assign via skill-based routing
-    assigned_to  = _find_best_agent(category, priority) or 'Unassigned'
-    initial_status = 'In Progress' if assigned_to != 'Unassigned' else 'Open'
+    # Try auto-assignment by role (agent skills matching the ticket category)
+    auto_agent = _find_best_agent(category, priority)
 
     new_row = {
         'Ticket_ID':             tid,
-        'Status':                initial_status,
+        'Status':                'Open',        # stays Open until agent accepts
         'Priority':              priority,
         'Category':              category,
-        'Assigned_To':           assigned_to,
+        'Assigned_To':           auto_agent if auto_agent else 'Unassigned',
         'Created_Date':          datetime.now().strftime('%Y-%m-%d %H:%M'),
         'Resolution_Time_Hours': '',
         'Created_By':            session['user'],
@@ -692,30 +689,40 @@ def submit_ticket():
     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df.to_excel(EXCEL_FILE, index=False)
 
-    assign_detail = f"Auto-assigned to {assigned_to}" if assigned_to != 'Unassigned' else "No available agent — set to Unassigned"
-    log_ticket_event(tid, u['email'], u['name'], 'created',
-                     f"Ticket created — Category: {category}, Priority: {priority}. {assign_detail}")
-
-    # Notify assigned agent
-    if assigned_to != 'Unassigned':
-        add_notification(assigned_to,
-            f"New ticket {tid} auto-assigned to you: {category} ({priority})", tid, 'new_ticket')
-        send_email_notification(assigned_to, f"Ticket {tid} Assigned to You",
-            f"<p>Ticket <b>{tid}</b> ({category}, {priority}) has been auto-assigned to you.</p>"
-            f"<p>Description: {desc[:200]}</p>")
-
-    # Notify all admins
-    for email, user_data in get_users().items():
-        if user_data.get('role') == 'admin':
-            add_notification(email,
-                f"New ticket {tid}: {category} ({priority})", tid, 'new_ticket')
+    if auto_agent:
+        log_ticket_event(tid, u['email'], u['name'], 'created',
+                         f"Ticket created — Category: {category}, Priority: {priority}. "
+                         f"Auto-assigned to {auto_agent} by role match.")
+        # Notify assigned agent
+        add_notification(auto_agent,
+            f"Ticket {tid} auto-assigned to you by role: {category} ({priority}). Accept or Decline.",
+            tid, 'new_ticket')
+        send_email_notification(auto_agent,
+            f"[Action Required] Ticket {tid} Assigned to You",
+            f"<p>Ticket <b>{tid}</b> ({category}, {priority}) was auto-assigned to you based on your role.</p>"
+            f"<p>Description: {desc[:200]}</p>"
+            f"<p><b>Please log in and Accept or Decline from your queue.</b></p>")
+    else:
+        log_ticket_event(tid, u['email'], u['name'], 'created',
+                         f"Ticket created — Category: {category}, Priority: {priority}. "
+                         f"No matching agent role — queued for admin assignment.")
+        # Notify admins only when no agent could be auto-assigned
+        for email, user_data in get_users().items():
+            if user_data.get('role') == 'admin':
+                add_notification(email,
+                    f"New ticket {tid} needs manual assignment (no matching role): {category} ({priority})",
+                    tid, 'new_ticket')
 
     send_email_notification(
         session['user'],
         f"Ticket {tid} Submitted",
         f"<p>Your ticket <b>{tid}</b> ({category}) has been submitted successfully.</p>"
-        f"<p>Priority: {priority}</p>"
+        f"<p>Priority: {priority}. An agent will be assigned shortly.</p>"
     )
+
+    # Auto-merge if this ticket is a duplicate of an existing one
+    _auto_merge_check(tid)
+
     return jsonify({"success": True, "ticket_id": tid})
 
 @app.route('/api/update_ticket', methods=['POST'])
@@ -942,7 +949,8 @@ def upload_attachment(ticket_id):
     if mask.any():
         if 'Attachments' not in df.columns:
             df['Attachments'] = ''
-        existing = str(df.loc[mask, 'Attachments'].iloc[0])
+        raw_val = df.loc[mask, 'Attachments'].iloc[0]
+        existing = '' if pd.isna(raw_val) else str(raw_val)
         df.loc[mask, 'Attachments'] = (existing.strip(',') + ',' + filename).strip(',')
         df.to_excel(EXCEL_FILE, index=False)
 
@@ -957,8 +965,9 @@ def get_attachments(ticket_id):
     mask = df['Ticket_ID'].astype(str).str.strip() == ticket_id.strip()
     if not mask.any() or 'Attachments' not in df.columns:
         return jsonify([])
-    raw   = str(df[mask].iloc[0].get('Attachments', ''))
-    files = [f.strip() for f in raw.split(',') if f.strip()]
+    raw_val = df[mask].iloc[0].get('Attachments', '')
+    raw     = '' if pd.isna(raw_val) else str(raw_val)
+    files   = [f.strip() for f in raw.split(',') if f.strip()]
     return jsonify([{"filename": f, "url": f"/static/uploads/{f}"} for f in files])
 
 # ── Internal Notes API (agent/admin only) ─────────────────────────────────────
@@ -1133,12 +1142,15 @@ def admin_create_user():
     name  = data.get('name', '').strip()
     pw    = data.get('password', '').strip()
     role  = data.get('role', 'user')
-    if not email or not name or not pw:
-        return jsonify({"success": False, "error": "Email, name, and password are required"})
+    if not name or not pw:
+        return jsonify({"success": False, "error": "Name and password are required"})
     if len(pw) < 6:
         return jsonify({"success": False, "error": "Password must be at least 6 characters"})
     if role not in ('admin', 'agent', 'user'):
         role = 'user'
+    # Auto-generate a unique key if no email provided
+    if not email:
+        email = f"user_{uuid.uuid4().hex[:8]}"
     users = get_users()
     if email in users:
         return jsonify({"success": False, "error": "Email already exists"})
@@ -1400,8 +1412,8 @@ def decline_ticket(ticket_id):
 # ── Canned responses (quick reply templates) ───────────────────────────────────
 
 def _get_canned():
-    data = _read_json(CANNED_FILE, None)
-    if data is None:
+    data = _read_json(CANNED_FILE, [])
+    if not data:
         _write_json(CANNED_FILE, DEFAULT_CANNED)
         return DEFAULT_CANNED
     return data
@@ -1630,7 +1642,195 @@ def chat_unread():
     return jsonify({"count": count})
 
 
+# ── Unassigned ticket count (for nav badge) ───────────────────────────────────
+
+@app.route('/api/unassigned_count')
+def unassigned_count():
+    if not is_admin(): return jsonify({"count": 0})
+    df = get_safe_data()
+    if df.empty: return jsonify({"count": 0})
+    unassigned_mask   = df['Assigned_To'].astype(str).str.strip().isin(['Unassigned', '', 'nan'])
+    pending_mask      = (df['Status'].astype(str).str.strip() == 'Open') & ~unassigned_mask
+    return jsonify({"count": int(unassigned_mask.sum() + pending_mask.sum())})
+
+
+# ── Assignment workflow ────────────────────────────────────────────────────────
+
+@app.route('/assign')
+def assign_tickets():
+    if 'user' not in session: return redirect(url_for('login'))
+    if not is_admin():        return redirect(url_for('my_tickets'))
+    return render_template('assign_tickets.html')
+
+
+@app.route('/api/assignment_queue')
+def assignment_queue():
+    if not is_admin(): return jsonify({"error": "Unauthorized"}), 403
+    df    = get_safe_data()
+    users = get_users()
+    now   = datetime.now()
+
+    # Only truly unassigned tickets need admin assignment.
+    # Once Assigned_To is set (even if still Open), the ticket is in the agent's
+    # pending-acceptance queue — remove it from this panel immediately.
+    unassigned = []
+    if not df.empty:
+        mask = (
+            df['Assigned_To'].astype(str).str.strip().isin(['Unassigned', '', 'nan'])
+        )
+        q_df = df[mask].fillna('').copy()
+        for _, row in q_df.iterrows():
+            r        = row.to_dict()
+            priority = str(r.get('Priority', 'Low'))
+            sla_hrs  = SLA_HOURS.get(priority, 24)
+            created  = row.get('Created_Date')
+            if pd.notna(created) and str(created).strip():
+                try:
+                    created_dt   = pd.to_datetime(created)
+                    elapsed_s    = (now - created_dt).total_seconds()
+                    remaining_s  = (sla_hrs * 3600) - elapsed_s
+                    pct          = (elapsed_s / (sla_hrs * 3600)) * 100
+                    r['SLA_Remaining_Seconds'] = int(remaining_s)
+                    r['SLA_Pct']               = round(pct, 1)
+                    if remaining_s < 0:
+                        r['SLA_Status'] = 'breached'
+                    elif pct >= 75:
+                        r['SLA_Status'] = 'near_breach'
+                    else:
+                        r['SLA_Status'] = 'on_track'
+                except Exception:
+                    r['SLA_Remaining_Seconds'] = None
+                    r['SLA_Pct']               = 0
+                    r['SLA_Status']            = 'unknown'
+            else:
+                r['SLA_Remaining_Seconds'] = None
+                r['SLA_Pct']               = 0
+                r['SLA_Status']            = 'unknown'
+            unassigned.append(r)
+
+    # Sort: Critical first, then by SLA_Pct descending
+    priority_order = {'Critical': 0, 'High': 1, 'Medium': 2, 'Low': 3}
+    unassigned.sort(key=lambda x: (priority_order.get(x.get('Priority', 'Low'), 3), -(x.get('SLA_Pct') or 0)))
+
+    # All agents with live workload
+    agents = []
+    for email, u in users.items():
+        if u.get('role') != 'agent':
+            continue
+        workload = _get_agent_workload(email)
+        max_wl   = u.get('max_workload', 10)
+        agents.append({
+            "email":            email,
+            "name":             u.get('name', email),
+            "availability":     u.get('availability_status', 'online'),
+            "skills":           u.get('skills', []),
+            "current_workload": workload,
+            "max_workload":     max_wl,
+            "capacity_pct":     round((workload / max_wl) * 100, 1) if max_wl > 0 else 100
+        })
+    agents.sort(key=lambda x: (x['availability'] != 'online', x['capacity_pct']))
+
+    # Pending acceptance: Open tickets that already have an agent assigned
+    pending_acceptance = 0
+    if not df.empty:
+        assigned_mask = ~df['Assigned_To'].astype(str).str.strip().isin(['Unassigned', '', 'nan'])
+        open_mask     = df['Status'].astype(str).str.strip() == 'Open'
+        pending_acceptance = int((assigned_mask & open_mask).sum())
+
+    return jsonify({
+        "unassigned_tickets": unassigned,
+        "agents":             agents,
+        "summary": {
+            "total_unassigned":   len(unassigned),
+            "pending_acceptance": pending_acceptance,
+            "agents_online":      sum(1 for a in agents if a['availability'] == 'online'),
+            "agents_busy":        sum(1 for a in agents if a['availability'] == 'busy'),
+            "agents_away":        sum(1 for a in agents if a['availability'] == 'away'),
+        }
+    })
+
+
+@app.route('/api/tickets/<ticket_id>/assign', methods=['POST'])
+def assign_ticket(ticket_id):
+    if not is_admin(): return jsonify({"success": False, "error": "Unauthorized"}), 403
+    body        = request.get_json() or {}
+    agent_email = body.get('agent_email', '').strip()
+    if not agent_email:
+        return jsonify({"success": False, "error": "agent_email required"})
+    users = get_users()
+    if agent_email not in users or users[agent_email].get('role') not in ('agent', 'admin'):
+        return jsonify({"success": False, "error": "Agent not found"})
+
+    df   = get_safe_data()
+    mask = df['Ticket_ID'].astype(str).str.strip() == ticket_id.strip()
+    if not mask.any():
+        return jsonify({"success": False, "error": "Ticket not found"})
+
+    old_row   = df[mask].iloc[0].to_dict()
+    old_agent = str(old_row.get('Assigned_To', 'Unassigned'))
+
+    # Keep status as 'Open' so agent must explicitly Accept or Decline
+    current_status = str(old_row.get('Status', 'Open'))
+    new_status = current_status if current_status not in ('Resolved', 'Closed') else 'Open'
+    if new_status not in ('Open', 'In Progress'):
+        new_status = 'Open'
+
+    df.loc[mask, 'Assigned_To']  = agent_email
+    df.loc[mask, 'Status']       = new_status
+    df.loc[mask, 'Last_Updated'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+    df.to_excel(EXCEL_FILE, index=False)
+
+    u = current_user_info()
+    log_ticket_event(ticket_id, u['email'], u['name'], 'assigned',
+                     f"Manually assigned to {agent_email} by admin (was: {old_agent}). Awaiting agent acceptance.")
+
+    category   = str(old_row.get('Category', ''))
+    priority   = str(old_row.get('Priority', 'Low'))
+    agent_name = users[agent_email].get('name', agent_email)
+
+    add_notification(agent_email,
+        f"Ticket {ticket_id} assigned to you by admin — please Accept or Decline: {category} ({priority})",
+        ticket_id, 'new_ticket')
+    send_email_notification(agent_email,
+        f"[Action Required] Ticket {ticket_id} Assigned to You",
+        f"<p>Admin <b>{u['name']}</b> assigned ticket <b>{ticket_id}</b> to you.</p>"
+        f"<p>Category: {category} | Priority: {priority}</p>"
+        f"<p>Description: {str(old_row.get('Description',''))[:200]}</p>"
+        f"<p><b>Please log in and Accept or Decline this ticket from your queue.</b></p>")
+
+    # Notify ticket creator
+    creator = str(old_row.get('Created_By', ''))
+    if creator and creator != agent_email:
+        add_notification(creator,
+            f"Your ticket {ticket_id} has been assigned to {agent_name} (pending acceptance)",
+            ticket_id, 'update')
+
+    return jsonify({"success": True, "assigned_to": agent_email, "agent_name": agent_name})
+
+
 # ── Agent list for transfer modal ──────────────────────────────────────────────
+
+@app.route('/api/agents/available')
+def list_agents_available():
+    """All agents with workload + role info — used by the agent overview tab."""
+    if not is_admin(): return jsonify([])
+    users = get_users()
+    result = []
+    for email, usr in users.items():
+        if usr.get('role') != 'agent':
+            continue
+        workload = _get_agent_workload(email)
+        result.append({
+            "email":               email,
+            "name":                usr.get('name', email),
+            "availability_status": usr.get('availability_status', 'online'),
+            "skills":              usr.get('skills', []),
+            "max_workload":        usr.get('max_workload', 10),
+            "current_workload":    workload,
+        })
+    result.sort(key=lambda x: (x['availability_status'] != 'online', x['current_workload']))
+    return jsonify(result)
+
 
 @app.route('/api/agents')
 def list_agents():
@@ -1644,6 +1844,170 @@ def list_agents():
         for email, usr in users.items()
         if usr.get('role') in ('agent', 'admin') and email != u['email']
     ])
+
+
+# ── Duplicate detection & auto-merge (backend only) ───────────────────────────
+
+def _jaccard_similarity(text_a, text_b):
+    """Word-level Jaccard similarity between two strings (0.0 – 1.0)."""
+    stop = {'the','a','an','is','it','in','on','at','to','of','and','or','for',
+            'my','i','me','we','our','your','can','not','with','this','that',
+            'are','was','have','has','be','been','do','did','please','help'}
+    def tokens(t):
+        return {w for w in re.sub(r'[^a-z0-9 ]', ' ', t.lower()).split() if w and w not in stop}
+    a, b = tokens(text_a), tokens(text_b)
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _perform_merge(df, master_id, duplicate_ids, actor_name, actor_email):
+    """Core merge logic (no HTTP context required).
+
+    Closes each duplicate, copies its comments/history into the master,
+    appends its description, and notifies all affected users.
+    Returns the updated DataFrame (caller must save to Excel).
+    """
+    now_str       = datetime.now().strftime('%Y-%m-%d %H:%M')
+    comments_data = _read_json(COMMENTS_FILE, {})
+    history_data  = _read_json(HISTORY_FILE,  {})
+    extra_descs   = []
+    notified      = set()
+
+    for dup_id in duplicate_ids:
+        dup_mask = df['Ticket_ID'].astype(str).str.strip() == dup_id
+        if not dup_mask.any():
+            continue
+        dup_row  = df[dup_mask].iloc[0].to_dict()
+
+        # Collect description snippet
+        dup_desc = str(dup_row.get('Description', '')).strip()
+        if dup_desc:
+            extra_descs.append(f"[From {dup_id}] {dup_desc}")
+
+        # Copy comments → master
+        for c in comments_data.get(dup_id, []):
+            comments_data.setdefault(master_id, []).append({
+                **c,
+                "id":   str(uuid.uuid4()),
+                "body": f"[Merged from {dup_id}] {c['body']}",
+                "time": c.get('time', now_str)
+            })
+
+        # Copy history → master
+        for h in history_data.get(dup_id, []):
+            history_data.setdefault(master_id, []).append({
+                **h,
+                "detail":    f"[Merged from {dup_id}] {h.get('detail','')}",
+                "timestamp": h.get('timestamp', now_str)
+            })
+
+        # Close the duplicate
+        df.loc[dup_mask, 'Status']       = 'Closed'
+        df.loc[dup_mask, 'Last_Updated'] = now_str
+        if 'Resolved_Date' not in df.columns:
+            df['Resolved_Date'] = ''
+        df.loc[dup_mask, 'Resolved_Date'] = now_str
+
+        # Leave a note on the duplicate
+        comments_data.setdefault(dup_id, []).append({
+            "id":     str(uuid.uuid4())[:8],
+            "author": actor_name,
+            "email":  actor_email,
+            "body":   f"This ticket was automatically merged into {master_id} as a duplicate.",
+            "time":   now_str
+        })
+        log_ticket_event(dup_id, actor_email, actor_name, 'merged',
+                         f"Auto-merged into {master_id} (duplicate detected)")
+
+        # Notify duplicate creator
+        creator = str(dup_row.get('Created_By', ''))
+        if creator and creator not in notified:
+            notified.add(creator)
+            add_notification(creator,
+                f"Your ticket {dup_id} was automatically merged into {master_id} as a duplicate.",
+                master_id, 'update')
+
+    # Update master description
+    master_mask = df['Ticket_ID'].astype(str).str.strip() == master_id
+    master_row  = df[master_mask].iloc[0].to_dict()
+    if extra_descs:
+        base = str(master_row.get('Description', '')).strip()
+        df.loc[master_mask, 'Description'] = (
+            base + '\n\n--- Auto-merged duplicates ---\n' + '\n'.join(extra_descs)
+        )
+    df.loc[master_mask, 'Last_Updated'] = now_str
+
+    _write_json(COMMENTS_FILE, comments_data)
+    _write_json(HISTORY_FILE,  history_data)
+
+    log_ticket_event(master_id, actor_email, actor_name, 'merged',
+                     f"Auto-merged duplicates: {', '.join(duplicate_ids)}")
+
+    # Notify master creator
+    master_creator = str(master_row.get('Created_By', ''))
+    if master_creator:
+        add_notification(master_creator,
+            f"Ticket {master_id} absorbed {len(duplicate_ids)} duplicate ticket(s) automatically.",
+            master_id, 'update')
+
+    # Notify all admins
+    for email, u in get_users().items():
+        if u.get('role') == 'admin':
+            add_notification(email,
+                f"Auto-merged {len(duplicate_ids)} duplicate(s) into {master_id}",
+                master_id, 'info')
+
+    return df
+
+
+def _auto_merge_check(new_ticket_id):
+    """Called after a new ticket is saved.
+
+    Compares the new ticket against all existing open tickets.
+    If a duplicate is found (same category + >= 50 % word overlap),
+    the new ticket is merged into the older master automatically.
+    """
+    AUTO_MERGE_THRESHOLD = 0.50   # 50 % Jaccard similarity required
+
+    try:
+        df = get_safe_data()
+        if df.empty:
+            return
+
+        new_mask = df['Ticket_ID'].astype(str).str.strip() == new_ticket_id
+        if not new_mask.any():
+            return
+        new_row  = df[new_mask].iloc[0].to_dict()
+        new_desc = str(new_row.get('Description', '')).strip()
+        new_cat  = str(new_row.get('Category', '')).strip()
+
+        # Compare against all other active (non-closed/resolved) tickets
+        active = df[
+            ~df['Ticket_ID'].astype(str).str.strip().eq(new_ticket_id) &
+            ~df['Status'].astype(str).str.strip().isin(['Closed', 'Resolved'])
+        ].fillna('')
+
+        best_match_id  = None
+        best_sim       = 0.0
+
+        for _, row in active.iterrows():
+            if str(row.get('Category', '')).strip() != new_cat:
+                continue   # must share same category
+            sim = _jaccard_similarity(new_desc, str(row.get('Description', '')))
+            if sim >= AUTO_MERGE_THRESHOLD and sim > best_sim:
+                best_sim       = sim
+                best_match_id  = str(row['Ticket_ID'])
+
+        if best_match_id:
+            # The older ticket is the master; the new one is the duplicate
+            df = _perform_merge(df, best_match_id, [new_ticket_id],
+                                actor_name='System', actor_email='system@auto-merge')
+            df.to_excel(EXCEL_FILE, index=False)
+            print(f"[Auto-Merge] {new_ticket_id} merged into {best_match_id} "
+                  f"(similarity {best_sim:.0%})")
+    except Exception as e:
+        print(f"[Auto-Merge Error] {e}")
 
 
 if __name__ == '__main__':

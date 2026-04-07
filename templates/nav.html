@@ -1,348 +1,562 @@
-<nav class="flex justify-between items-center mb-10 border-b border-white/5 pb-4">
-    <div class="flex gap-6 items-center">
+<style>
+/* ═══════════════════════════════════════════════
+   TICKETMITRA  —  GLOBAL NAV STYLES
+   ═══════════════════════════════════════════════ */
+
+/* Break out of any page padding so nav spans full width */
+.tm-nav-outer {
+    background: #0a0a0a;
+    border-bottom: 2px solid rgba(220,38,38,0.5);
+    box-shadow: 0 4px 40px rgba(220,38,38,0.12), 0 2px 8px rgba(0,0,0,0.8);
+    margin: -1.5rem -1.5rem 2.5rem -1.5rem;
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 999;
+}
+
+/* Inner flex row */
+.tm-nav-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100px;
+    gap: 0;
+}
+
+/* ── Logo ── */
+.nav-logo-link {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-right: 2.5rem;
+    transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), filter 0.2s ease;
+}
+.nav-logo-link img {
+    height: 90px;
+    width: auto;
+    filter: drop-shadow(0 0 8px rgba(220,38,38,0.5));
+}
+.nav-logo-link:hover {
+    transform: scale(1.05) translateY(-1px);
+    filter: drop-shadow(0 0 16px rgba(220,38,38,0.8));
+}
+
+/* ── Nav Links ── */
+.tm-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.nav-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #ffffff;
+    text-decoration: none;
+    transition: color 0.15s ease, background 0.15s ease, letter-spacing 0.15s ease;
+    white-space: nowrap;
+}
+.nav-link:hover {
+    color: #ef4444;
+    background: rgba(220,38,38,0.08);
+    letter-spacing: 0.12em;
+}
+.nav-link.active {
+    color: #ef4444;
+    background: rgba(220,38,38,0.1);
+}
+.nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px; left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 2px;
+    background: #dc2626;
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(220,38,38,0.7);
+}
+
+/* ── Right side actions ── */
+.tm-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 1rem;
+}
+
+/* Search */
+.tm-search-wrap {
+    position: relative;
+}
+.tm-search-input {
+    background: #141414;
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 0.45rem 0.9rem;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    color: #d4d4d8;
+    outline: none;
+    width: 180px;
+    transition: border-color 0.2s, box-shadow 0.2s, width 0.3s;
+}
+.tm-search-input:focus {
+    border-color: rgba(220,38,38,0.6);
+    box-shadow: 0 0 0 3px rgba(220,38,38,0.08);
+    width: 220px;
+}
+.tm-search-input::placeholder { color: #52525b; }
+
+/* Icon buttons */
+.nav-icon-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: #141414;
+    border: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+    font-size: 1.15rem;
+    transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1),
+                filter 0.18s ease,
+                background 0.18s ease,
+                border-color 0.18s ease;
+    color: #a1a1aa;
+}
+.nav-icon-btn:hover {
+    transform: scale(1.22) translateY(-2px);
+    filter: brightness(1.8) drop-shadow(0 0 8px rgba(220,38,38,0.7));
+    background: rgba(220,38,38,0.12);
+    border-color: rgba(220,38,38,0.4);
+    color: #f87171;
+}
+.nav-icon-btn:active { transform: scale(0.93); }
+
+/* User name */
+.nav-username {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #71717a;
+    font-family: monospace;
+    text-decoration: none;
+    transition: color 0.15s;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.nav-username:hover { color: #ef4444; }
+
+/* Logout */
+.nav-logout {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fff;
+    background: rgba(220,38,38,0.15);
+    border: 1px solid rgba(220,38,38,0.3);
+    padding: 0.45rem 1rem;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s;
+    white-space: nowrap;
+}
+.nav-logout:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+    transform: scale(1.05);
+    box-shadow: 0 0 14px rgba(220,38,38,0.5);
+    color: #fff;
+}
+
+/* ── Hamburger (mobile) ── */
+.tm-hamburger {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+}
+.tm-hamburger span {
+    display: block;
+    width: 24px; height: 2px;
+    background: #fff;
+    border-radius: 2px;
+    transition: all 0.25s;
+}
+.tm-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.tm-hamburger.open span:nth-child(2) { opacity: 0; }
+.tm-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Mobile menu drawer */
+.tm-mobile-menu {
+    display: none;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1rem 2rem 1.25rem;
+    border-top: 1px solid rgba(220,38,38,0.2);
+    background: #0a0a0a;
+}
+.tm-mobile-menu.open { display: flex; }
+.tm-mobile-menu .nav-link { width: 100%; padding: 0.65rem 1rem; }
+
+/* ── Responsive breakpoints ── */
+@media (max-width: 900px) {
+    .tm-nav-links { display: none; }
+    .tm-hamburger { display: flex; }
+    .tm-search-wrap { display: none; }
+    .nav-logo-link img { height: 64px; }
+    .tm-nav-outer { margin: -1rem -1rem 2rem -1rem; padding: 0 1rem; }
+    .tm-nav-inner { height: 60px; }
+}
+@media (max-width: 480px) {
+    .nav-username { display: none; }
+    .nav-logo-link img { height: 48px; }
+}
+</style>
+
+<div class="tm-nav-outer">
+  <div class="tm-nav-inner">
+
+    <!-- LEFT: Logo + Links -->
+    <div style="display:flex;align-items:center;flex:1;min-width:0;">
+      <a href="/" class="nav-logo-link">
+        <img src="/static/ticketmitra_logo.png" alt="TicketMitra">
+      </a>
+
+      <div class="tm-nav-links">
         {% if is_admin_user %}
-            <a href="/dashboard"    class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'dashboard'    else 'text-zinc-500 hover:text-white transition-colors' }}">DASHBOARD</a>
-            <a href="/tickets"      class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'tickets'      else 'text-zinc-500 hover:text-white transition-colors' }}">TICKETS</a>
-            <a href="/manage"       class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'manage'       else 'text-zinc-500 hover:text-white transition-colors' }}">MANAGE</a>
-            <a href="/manage_users" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'manage_users' else 'text-zinc-500 hover:text-white transition-colors' }}">USERS</a>
+          <a href="/dashboard"    class="nav-link {{ 'active' if active == 'dashboard'    else '' }}">Dashboard</a>
+          <a href="/tickets"      class="nav-link {{ 'active' if active == 'tickets'      else '' }}">Tickets</a>
+          <a href="/manage"       class="nav-link {{ 'active' if active == 'manage'       else '' }}">Manage</a>
+          <a href="/manage_users" class="nav-link {{ 'active' if active == 'manage_users' else '' }}">Users</a>
+          <a href="/assign"       class="nav-link {{ 'active' if active == 'assign'       else '' }}" style="position:relative;">
+            Assign
+            <span id="assign-badge" class="hidden" style="font-size:0.6rem;font-weight:900;background:#eab308;color:#000;padding:1px 5px;border-radius:999px;line-height:1.4;">0</span>
+          </a>
         {% elif is_agent_user %}
-            <a href="/agent/dashboard" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'agent_dashboard' else 'text-zinc-500 hover:text-white transition-colors' }}">MY STATS</a>
-            <a href="/agent/queue"     class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'agent_queue'     else 'text-zinc-500 hover:text-white transition-colors' }}">MY QUEUE</a>
-            <a href="/tickets"         class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'tickets'         else 'text-zinc-500 hover:text-white transition-colors' }}">ALL TICKETS</a>
+          <a href="/agent/dashboard" class="nav-link {{ 'active' if active == 'agent_dashboard' else '' }}">My Stats</a>
+          <a href="/agent/queue"     class="nav-link {{ 'active' if active == 'agent_queue'     else '' }}">My Queue</a>
+          <a href="/tickets"         class="nav-link {{ 'active' if active == 'tickets'         else '' }}">All Tickets</a>
         {% else %}
-            <a href="/my_tickets"    class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'my_tickets'    else 'text-zinc-500 hover:text-white transition-colors' }}">MY TICKETS</a>
-            <a href="/create_ticket" class="{{ 'text-red-600 font-bold border-b-2 border-red-600' if active == 'create_ticket' else 'text-zinc-500 hover:text-white transition-colors' }}">CREATE TICKET</a>
+          <a href="/my_tickets"    class="nav-link {{ 'active' if active == 'my_tickets'    else '' }}">My Tickets</a>
+          <a href="/create_ticket" class="nav-link {{ 'active' if active == 'create_ticket' else '' }}">Create Ticket</a>
         {% endif %}
+      </div>
     </div>
 
-    <div class="flex items-center gap-4">
-        <!-- Global Search -->
-        {% if current_user %}
-        <div class="relative">
-            <input type="text" id="global-search" placeholder="Search tickets..."
-                   oninput="handleGlobalSearch(this.value)"
-                   autocomplete="off"
-                   class="bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-xl text-xs text-zinc-300 outline-none focus:border-red-600 w-44 transition-colors">
-            <div id="search-dropdown" class="hidden absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-800 rounded-xl z-50 max-h-52 overflow-y-auto shadow-2xl">
-            </div>
-        </div>
-        {% endif %}
+    <!-- RIGHT: Search + Icons + User + Logout -->
+    <div class="tm-nav-actions">
 
-        <!-- Notification Bell (all logged-in users) -->
-        {% if current_user %}
-        <div class="relative">
-            <button onclick="toggleNotif()" class="text-zinc-400 hover:text-white text-xl relative">
-                🔔
-                <span id="notif-badge" class="hidden absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">0</span>
-            </button>
-            <div id="notif-dropdown" style="display:none;position:absolute;right:0;top:2rem;width:20rem;background:#111;border:1px solid #333;border-radius:1rem;z-index:50;padding:1rem;">
-                <div class="flex justify-between items-center mb-3">
-                    <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Notifications</p>
-                    <button onclick="markAllRead()" class="text-[9px] text-zinc-600 hover:text-red-500 uppercase transition-colors">Mark all read</button>
-                </div>
-                <div id="notif-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
-            </div>
+      {% if current_user %}
+      <div class="tm-search-wrap">
+        <input type="text" id="global-search" placeholder="🔍  Search tickets…"
+               oninput="handleGlobalSearch(this.value)" autocomplete="off"
+               class="tm-search-input">
+        <div id="search-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:#111;border:1px solid rgba(220,38,38,0.25);border-radius:12px;z-index:60;max-height:220px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.7);">
         </div>
-        {% endif %}
+      </div>
+      {% endif %}
 
-        <!-- Chat icon (agent/admin only) -->
-        {% if current_user and current_user.role in ('admin','agent') %}
-        <div class="relative">
-            <button onclick="toggleChat()" class="text-zinc-400 hover:text-white text-xl relative">
-                💬
-                <span id="chat-badge" class="hidden absolute -top-1 -right-1 bg-blue-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">0</span>
-            </button>
+      {% if current_user %}
+      <div style="position:relative;">
+        <button onclick="toggleNotif()" class="nav-icon-btn" title="Notifications">
+          🔔
+          <span id="notif-badge" class="hidden" style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;font-size:0.55rem;font-weight:900;border-radius:999px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;box-shadow:0 0 6px rgba(220,38,38,0.7);">0</span>
+        </button>
+        <div id="notif-dropdown" style="display:none;position:absolute;right:0;top:calc(100% + 10px);width:22rem;background:#111;border:1px solid rgba(220,38,38,0.25);border-radius:14px;z-index:60;padding:1rem;box-shadow:0 12px 40px rgba(0,0,0,0.8);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+            <p style="font-size:0.65rem;font-weight:800;color:#52525b;text-transform:uppercase;letter-spacing:0.15em;">Notifications</p>
+            <button onclick="markAllRead()" style="font-size:0.6rem;color:#52525b;background:none;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:0.05em;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'">Mark all read</button>
+          </div>
+          <div id="notif-list" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:0.4rem;"></div>
         </div>
-        {% endif %}
+      </div>
+      {% endif %}
 
-        <a href="/profile" class="text-xs text-zinc-600 font-mono hover:text-red-500 transition-colors">{{ current_user.name if current_user else '' }}</a>
-        <a href="/logout" class="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1 rounded transition-colors">LOGOUT</a>
+      {% if current_user and current_user.role in ('admin','agent') %}
+      <div style="position:relative;">
+        <button onclick="toggleChat()" class="nav-icon-btn" title="Team Chat">
+          💬
+          <span id="chat-badge" class="hidden" style="position:absolute;top:-4px;right:-4px;background:#2563eb;color:#fff;font-size:0.55rem;font-weight:900;border-radius:999px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;">0</span>
+        </button>
+      </div>
+      {% endif %}
+
+      {% if current_user %}
+      <a href="/profile" class="nav-username" title="Profile">{{ current_user.name if current_user else '' }}</a>
+      {% endif %}
+
+      <a href="/logout" class="nav-logout">Logout</a>
+
+      <!-- Hamburger (mobile) -->
+      <button class="tm-hamburger" id="tm-hamburger" onclick="toggleMobileMenu()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
-</nav>
+
+  </div><!-- end inner -->
+
+  <!-- Mobile menu drawer -->
+  <div class="tm-mobile-menu" id="tm-mobile-menu">
+    {% if is_admin_user %}
+      <a href="/dashboard"    class="nav-link {{ 'active' if active == 'dashboard'    else '' }}">Dashboard</a>
+      <a href="/tickets"      class="nav-link {{ 'active' if active == 'tickets'      else '' }}">Tickets</a>
+      <a href="/manage"       class="nav-link {{ 'active' if active == 'manage'       else '' }}">Manage</a>
+      <a href="/manage_users" class="nav-link {{ 'active' if active == 'manage_users' else '' }}">Users</a>
+      <a href="/assign"       class="nav-link {{ 'active' if active == 'assign'       else '' }}">Assign</a>
+    {% elif is_agent_user %}
+      <a href="/agent/dashboard" class="nav-link {{ 'active' if active == 'agent_dashboard' else '' }}">My Stats</a>
+      <a href="/agent/queue"     class="nav-link {{ 'active' if active == 'agent_queue'     else '' }}">My Queue</a>
+      <a href="/tickets"         class="nav-link {{ 'active' if active == 'tickets'         else '' }}">All Tickets</a>
+    {% else %}
+      <a href="/my_tickets"    class="nav-link {{ 'active' if active == 'my_tickets'    else '' }}">My Tickets</a>
+      <a href="/create_ticket" class="nav-link {{ 'active' if active == 'create_ticket' else '' }}">Create Ticket</a>
+    {% endif %}
+    {% if current_user %}
+    <div style="padding-top:0.5rem;border-top:1px solid rgba(255,255,255,0.05);margin-top:0.5rem;">
+      <div class="tm-search-wrap" style="display:block;width:100%;">
+        <input type="text" placeholder="🔍  Search tickets…" oninput="handleGlobalSearch(this.value)"
+               autocomplete="off" class="tm-search-input" style="width:100%;">
+        <div id="search-dropdown-mobile" style="display:none;"></div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div><!-- end outer -->
 
 <script>
-    // ── Notification bell ──────────────────────────────────────────────────────
-    function toggleNotif() {
+// ── Mobile hamburger ──────────────────────────────────────────────────────────
+function toggleMobileMenu() {
+    const menu = document.getElementById('tm-mobile-menu');
+    const btn  = document.getElementById('tm-hamburger');
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+}
+
+// ── Notification bell ─────────────────────────────────────────────────────────
+function toggleNotif() {
+    const dd = document.getElementById('notif-dropdown');
+    if (!dd) return;
+    const isOpen = dd.style.display === 'block';
+    dd.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) loadNavNotifications();
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#notif-dropdown') && !e.target.closest('.nav-icon-btn[title="Notifications"]')) {
         const dd = document.getElementById('notif-dropdown');
-        if (dd) {
-            const isOpen = dd.style.display === 'block';
-            dd.style.display = isOpen ? 'none' : 'block';
-            if (!isOpen) loadNavNotifications();
-        }
+        if (dd) dd.style.display = 'none';
     }
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('#notif-dropdown') && !e.target.closest('button[onclick="toggleNotif()"]')) {
-            const dd = document.getElementById('notif-dropdown');
-            if (dd) dd.style.display = 'none';
-        }
-    });
-    async function loadNavNotifications() {
-        try {
-            const res  = await fetch('/api/notifications');
-            const data = await res.json();
-            const badge = document.getElementById('notif-badge');
-            const list  = document.getElementById('notif-list');
-            if (!badge || !list) return;
-            const unread = data.filter(n => n.read === false || n.read === undefined);
-            if (data.length > 0) {
-                badge.textContent = data.length;
-                badge.classList.remove('hidden');
-                list.innerHTML = data.map(n => `
-                    <div class="flex items-start gap-2 border-b border-white/5 pb-2 cursor-pointer hover:bg-white/5 rounded p-1" onclick="goToTicket('${n.ticket_id || n.id}', '${n.id}')">
-                        <span class="text-xs mt-0.5 ${n.type==='new_ticket'?'text-green-400':n.type==='comment'?'text-blue-400':'text-red-400'}">●</span>
-                        <div class="flex-1">
-                            <p class="text-xs font-mono font-bold">${n.ticket_id || n.id || ''}</p>
-                            <p class="text-[10px] text-zinc-500">${n.message}</p>
-                            <p class="text-[9px] text-zinc-700">${n.time || ''}</p>
-                        </div>
-                    </div>`).join('');
-            } else {
-                badge.classList.add('hidden');
-                list.innerHTML = '<p class="text-xs text-zinc-600 text-center py-4">No new notifications</p>';
-            }
-        } catch(e) {}
-    }
-    async function markAllRead() {
-        await fetch('/api/notifications/mark_read', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
+});
+async function loadNavNotifications() {
+    try {
+        const res   = await fetch('/api/notifications');
+        const data  = await res.json();
         const badge = document.getElementById('notif-badge');
-        if (badge) badge.classList.add('hidden');
-        const list = document.getElementById('notif-list');
-        if (list) list.innerHTML = '<p class="text-xs text-zinc-600 text-center py-4">No new notifications</p>';
-    }
-    function goToTicket(ticketId, notifId) {
-        if (notifId) {
-            fetch('/api/notifications/mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: notifId })
-            });
-        }
-        if (ticketId && ticketId !== 'undefined') window.location.href = `/tickets/${ticketId}`;
-    }
-
-    // ── Global Search ──────────────────────────────────────────────────────────
-    let searchTimer;
-    async function handleGlobalSearch(val) {
-        clearTimeout(searchTimer);
-        const dd = document.getElementById('search-dropdown');
-        if (!val || val.length < 2) { dd.classList.add('hidden'); return; }
-        searchTimer = setTimeout(async () => {
-            try {
-                const res  = await fetch(`/api/search?q=${encodeURIComponent(val)}`);
-                const data = await res.json();
-                if (data.length === 0) {
-                    dd.innerHTML = '<p class="text-[10px] text-zinc-600 text-center py-3 px-4">No results found</p>';
-                } else {
-                    dd.innerHTML = data.map(r => `
-                        <a href="${r.url}" class="block px-4 py-2.5 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
-                            <p class="text-xs font-bold font-mono text-red-400">${r.id}</p>
-                            <p class="text-[10px] text-zinc-500">${r.label.split('—')[1] || ''}</p>
-                        </a>`).join('');
-                }
-                dd.classList.remove('hidden');
-            } catch(e) {}
-        }, 300);
-    }
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('#search-dropdown') && !e.target.closest('#global-search')) {
-            const dd = document.getElementById('search-dropdown');
-            if (dd) dd.classList.add('hidden');
-        }
-    });
-
-    // ── Theme: apply saved theme on load ──────────────────────────────────────
-    (function() {
-        const theme = localStorage.getItem('theme') || 'dark';
-        if (theme === 'light') document.body.classList.add('light-mode');
-    })();
-
-    // Load notifications badge count on page load
-    (function() {
-        fetch('/api/notifications').then(r=>r.json()).then(data => {
-            const badge = document.getElementById('notif-badge');
-            if (badge && data.length > 0) {
-                badge.textContent = data.length;
-                badge.classList.remove('hidden');
-            }
-        }).catch(()=>{});
-    })();
-
-    // ── Chat ──────────────────────────────────────────────────────────────────
-    let chatOpen      = false;
-    let chatRoom      = 'general';   // 'general' or an agent email
-    let chatPollTimer = null;
-    let lastMsgTime   = null;
-
-    function toggleChat() {
-        chatOpen = !chatOpen;
-        const panel = document.getElementById('chat-panel');
-        if (!panel) return;
-        panel.style.display = chatOpen ? 'flex' : 'none';
-        if (chatOpen) {
-            loadChatAgents();
-            loadChatMessages();
-            startChatPoll();
+        const list  = document.getElementById('notif-list');
+        if (!badge || !list) return;
+        if (data.length > 0) {
+            badge.textContent = data.length;
+            badge.classList.remove('hidden');
+            list.innerHTML = data.map(n => `
+                <div style="display:flex;align-items:flex-start;gap:0.5rem;padding:0.5rem;border-radius:8px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;"
+                     onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''"
+                     onclick="goToTicket('${n.ticket_id || n.id}','${n.id}')">
+                    <span style="font-size:0.65rem;margin-top:2px;color:${n.type==='new_ticket'?'#4ade80':n.type==='comment'?'#60a5fa':'#f87171'}">●</span>
+                    <div style="flex:1;min-width:0;">
+                        <p style="font-size:0.7rem;font-weight:700;font-family:monospace;">${n.ticket_id || n.id || ''}</p>
+                        <p style="font-size:0.65rem;color:#71717a;margin-top:1px;">${n.message}</p>
+                        <p style="font-size:0.6rem;color:#3f3f46;margin-top:1px;">${n.time || ''}</p>
+                    </div>
+                </div>`).join('');
         } else {
-            stopChatPoll();
+            badge.classList.add('hidden');
+            list.innerHTML = '<p style="font-size:0.7rem;color:#52525b;text-align:center;padding:1rem 0;">No new notifications</p>';
         }
-    }
+    } catch(e) {}
+}
+async function markAllRead() {
+    await fetch('/api/notifications/mark_read', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    const badge = document.getElementById('notif-badge');
+    if (badge) badge.classList.add('hidden');
+    const list = document.getElementById('notif-list');
+    if (list) list.innerHTML = '<p style="font-size:0.7rem;color:#52525b;text-align:center;padding:1rem 0;">No new notifications</p>';
+}
+function goToTicket(ticketId, notifId) {
+    if (notifId) fetch('/api/notifications/mark_read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:notifId})});
+    if (ticketId && ticketId !== 'undefined') window.location.href = `/tickets/${ticketId}`;
+}
 
-    function startChatPoll() {
-        if (chatPollTimer) return;
-        chatPollTimer = setInterval(loadChatMessages, 4000);
-    }
-    function stopChatPoll() {
-        clearInterval(chatPollTimer);
-        chatPollTimer = null;
-    }
-
-    function escapeChat(str) {
-        if (!str) return '';
-        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
-
-    async function loadChatAgents() {
+// ── Global Search ─────────────────────────────────────────────────────────────
+let searchTimer;
+async function handleGlobalSearch(val) {
+    clearTimeout(searchTimer);
+    const dd = document.getElementById('search-dropdown');
+    if (!dd) return;
+    if (!val || val.length < 2) { dd.style.display = 'none'; return; }
+    searchTimer = setTimeout(async () => {
         try {
-            const res    = await fetch('/api/agents');
-            const agents = await res.json();
-            const list   = document.getElementById('chat-agent-list');
-            if (!list) return;
-            const avail  = { online: '🟢', away: '🟡', busy: '🔴' };
-            list.innerHTML = `
-                <button onclick="switchChatRoom('general')" id="chat-room-general"
-                        class="chat-room-btn w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase bg-white/5 text-red-400 mb-1">
-                    🌐 Team Chat
-                </button>
-                ${agents.map(a => `
-                    <button onclick="switchChatRoom('${a.email}')" id="chat-room-${CSS.escape(a.email)}"
-                            class="chat-room-btn w-full text-left px-3 py-2 rounded-xl text-[10px] hover:bg-white/5 transition-colors text-zinc-400 flex items-center gap-2">
-                        <span>${avail[a.availability] || '⚪'}</span>
-                        <span class="truncate">${escapeChat(a.name)}</span>
-                    </button>
-                `).join('')}
-            `;
+            const res  = await fetch(`/api/search?q=${encodeURIComponent(val)}`);
+            const data = await res.json();
+            dd.innerHTML = data.length === 0
+                ? '<p style="font-size:0.65rem;color:#52525b;text-align:center;padding:0.75rem;">No results</p>'
+                : data.map(r => `<a href="${r.url}" style="display:block;padding:0.6rem 1rem;border-bottom:1px solid rgba(255,255,255,0.05);text-decoration:none;"
+                    onmouseover="this.style.background='rgba(220,38,38,0.07)'" onmouseout="this.style.background=''">
+                    <p style="font-size:0.72rem;font-weight:700;font-family:monospace;color:#f87171;">${r.id}</p>
+                    <p style="font-size:0.65rem;color:#71717a;">${r.label.split('—')[1]||''}</p>
+                </a>`).join('');
+            dd.style.display = 'block';
         } catch(e) {}
+    }, 300);
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#search-dropdown') && !e.target.closest('#global-search')) {
+        const dd = document.getElementById('search-dropdown');
+        if (dd) dd.style.display = 'none';
     }
+});
 
-    function switchChatRoom(room) {
-        chatRoom    = room;
-        lastMsgTime = null;
-        document.querySelectorAll('.chat-room-btn').forEach(b => {
-            b.classList.remove('bg-white/5','text-red-400');
-            b.classList.add('text-zinc-400');
+// Load notifications badge count on page load
+(function() {
+    fetch('/api/notifications').then(r=>r.json()).then(data => {
+        const badge = document.getElementById('notif-badge');
+        if (badge && data.length > 0) { badge.textContent = data.length; badge.classList.remove('hidden'); }
+    }).catch(()=>{});
+})();
+
+// ── Unassigned badge ──────────────────────────────────────────────────────────
+(function pollAssignBadge() {
+    const badge = document.getElementById('assign-badge');
+    if (!badge) return;
+    fetch('/api/unassigned_count').then(r=>r.json()).then(d => {
+        if (d.count > 0) { badge.textContent = d.count; badge.classList.remove('hidden'); }
+        else badge.classList.add('hidden');
+    }).catch(()=>{});
+    setTimeout(pollAssignBadge, 15000);
+})();
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+let chatOpen=false, chatRoom='general', chatPollTimer=null, lastMsgTime=null;
+
+function toggleChat() {
+    chatOpen = !chatOpen;
+    const panel = document.getElementById('chat-panel');
+    if (!panel) return;
+    panel.style.display = chatOpen ? 'flex' : 'none';
+    if (chatOpen) { loadChatAgents(); loadChatMessages(); startChatPoll(); }
+    else stopChatPoll();
+}
+function startChatPoll() { if (chatPollTimer) return; chatPollTimer = setInterval(loadChatMessages,4000); }
+function stopChatPoll()  { clearInterval(chatPollTimer); chatPollTimer=null; }
+function escapeChat(s)   { return s?(s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')):''; }
+
+async function loadChatAgents() {
+    try {
+        const res=await fetch('/api/agents'); const agents=await res.json();
+        const list=document.getElementById('chat-agent-list'); if(!list) return;
+        const avail={online:'🟢',away:'🟡',busy:'🔴'};
+        list.innerHTML=`
+            <button onclick="switchChatRoom('general')" id="chat-room-general"
+                class="chat-room-btn w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase bg-white/5 text-red-400 mb-1">
+                🌐 Team Chat</button>
+            ${agents.map(a=>`<button onclick="switchChatRoom('${a.email}')" id="chat-room-${CSS.escape(a.email)}"
+                class="chat-room-btn w-full text-left px-3 py-2 rounded-xl text-[10px] hover:bg-white/5 transition-colors text-zinc-400 flex items-center gap-2">
+                <span>${avail[a.availability]||'⚪'}</span><span class="truncate">${escapeChat(a.name)}</span></button>`).join('')}`;
+    } catch(e) {}
+}
+function switchChatRoom(room) {
+    chatRoom=room; lastMsgTime=null;
+    document.querySelectorAll('.chat-room-btn').forEach(b=>{b.classList.remove('bg-white/5','text-red-400');b.classList.add('text-zinc-400');});
+    const active=document.getElementById(`chat-room-${CSS.escape(room==='general'?'general':room)}`);
+    if(active){active.classList.add('bg-white/5','text-red-400');active.classList.remove('text-zinc-400');}
+    document.getElementById('chat-messages').innerHTML=''; loadChatMessages();
+}
+async function loadChatMessages() {
+    try {
+        let url=`/api/chat/messages?room=${encodeURIComponent(chatRoom)}`;
+        if(lastMsgTime) url+=`&since=${encodeURIComponent(lastMsgTime)}`;
+        const res=await fetch(url); const msgs=await res.json();
+        if(!msgs.length) return;
+        const box=document.getElementById('chat-messages');
+        const atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<60;
+        const currentEmail=document.getElementById('chat-current-email')?.value||'';
+        msgs.forEach(m=>{
+            if(document.getElementById('cmsg-'+m.id)) return;
+            const isMine=m.from_email===currentEmail;
+            const time=new Date(m.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+            const div=document.createElement('div');
+            div.id='cmsg-'+m.id; div.className=`flex ${isMine?'justify-end':'justify-start'} mb-2`;
+            div.innerHTML=`<div class="max-w-[75%] ${isMine?'bg-red-600/20 border border-red-600/30':'bg-zinc-800'} rounded-2xl px-4 py-2">
+                ${!isMine?`<p class="text-[9px] font-bold text-red-400 uppercase mb-1">${escapeChat(m.from_name)}</p>`:''}
+                <p class="text-xs text-zinc-200 leading-relaxed">${escapeChat(m.body)}</p>
+                <p class="text-[8px] text-zinc-600 mt-1 ${isMine?'text-right':''}">${time}</p></div>`;
+            box.appendChild(div); lastMsgTime=m.timestamp;
         });
-        const active = document.getElementById(`chat-room-${CSS.escape(room === 'general' ? 'general' : room)}`);
-        if (active) {
-            active.classList.add('bg-white/5','text-red-400');
-            active.classList.remove('text-zinc-400');
-        }
-        document.getElementById('chat-messages').innerHTML = '';
-        loadChatMessages();
-    }
+        if(atBottom) box.scrollTop=box.scrollHeight;
+    } catch(e) {}
+}
+async function sendChatMessage() {
+    const input=document.getElementById('chat-input'); if(!input) return;
+    const body=input.value.trim(); if(!body) return; input.value='';
+    try {
+        await fetch('/api/chat/messages',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({to:chatRoom==='general'?'all':chatRoom,body})});
+        lastMsgTime=null; loadChatMessages();
+    } catch(e) {}
+}
+document.addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey&&document.activeElement?.id==='chat-input'){e.preventDefault();sendChatMessage();}
+});
+(function pollChatUnread(){
+    fetch('/api/chat/unread').then(r=>r.json()).then(d=>{
+        const badge=document.getElementById('chat-badge'); if(!badge) return;
+        if(d.count>0){badge.textContent=d.count;badge.classList.remove('hidden');}
+        else badge.classList.add('hidden');
+    }).catch(()=>{});
+    setTimeout(pollChatUnread,15000);
+})();
 
-    async function loadChatMessages() {
-        try {
-            let url = `/api/chat/messages?room=${encodeURIComponent(chatRoom)}`;
-            if (lastMsgTime) url += `&since=${encodeURIComponent(lastMsgTime)}`;
-            const res  = await fetch(url);
-            const msgs = await res.json();
-            if (!msgs.length) return;
-
-            const box       = document.getElementById('chat-messages');
-            const atBottom  = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
-            const currentEmail = document.getElementById('chat-current-email')?.value || '';
-            msgs.forEach(m => {
-                if (document.getElementById('cmsg-' + m.id)) return;
-                const isMine = m.from_email === currentEmail;
-                const time   = new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-                const div    = document.createElement('div');
-                div.id       = 'cmsg-' + m.id;
-                div.className= `flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`;
-                div.innerHTML= `
-                    <div class="max-w-[75%] ${isMine ? 'bg-red-600/20 border border-red-600/30' : 'bg-zinc-800'} rounded-2xl px-4 py-2">
-                        ${!isMine ? `<p class="text-[9px] font-bold text-red-400 uppercase mb-1">${escapeChat(m.from_name)}</p>` : ''}
-                        <p class="text-xs text-zinc-200 leading-relaxed">${escapeChat(m.body)}</p>
-                        <p class="text-[8px] text-zinc-600 mt-1 ${isMine ? 'text-right' : ''}">${time}</p>
-                    </div>`;
-                box.appendChild(div);
-                lastMsgTime = m.timestamp;
-            });
-            if (atBottom) box.scrollTop = box.scrollHeight;
-        } catch(e) {}
-    }
-
-    async function sendChatMessage() {
-        const input = document.getElementById('chat-input');
-        if (!input) return;
-        const body  = input.value.trim();
-        if (!body)  return;
-        input.value = '';
-        try {
-            await fetch('/api/chat/messages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ to: chatRoom === 'general' ? 'all' : chatRoom, body })
-            });
-            lastMsgTime = null;
-            loadChatMessages();
-        } catch(e) {}
-    }
-
-    // Chat Enter key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey && document.activeElement?.id === 'chat-input') {
-            e.preventDefault();
-            sendChatMessage();
-        }
-    });
-
-    // Chat unread badge
-    (function pollChatUnread() {
-        fetch('/api/chat/unread').then(r=>r.json()).then(d => {
-            const badge = document.getElementById('chat-badge');
-            if (!badge) return;
-            if (d.count > 0) {
-                badge.textContent = d.count;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
-        }).catch(()=>{});
-        setTimeout(pollChatUnread, 15000);
-    })();
+// Theme
+(function(){ const t=localStorage.getItem('theme')||'dark'; if(t==='light') document.body.classList.add('light-mode'); })();
 </script>
 
-<!-- CHAT PANEL (fixed bottom-right) -->
+<!-- CHAT PANEL -->
 {% if current_user and current_user.role in ('admin','agent') %}
 <input type="hidden" id="chat-current-email" value="{{ current_user.email if current_user else '' }}">
-<div id="chat-panel" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;width:400px;height:520px;z-index:200;background:#0d0d0d;"
-     class="flex flex-col rounded-[1.5rem] overflow-hidden border border-white/10 shadow-2xl">
-
-    <!-- Header -->
+<div id="chat-panel" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;width:400px;height:520px;z-index:1000;background:#0d0d0d;border:1px solid rgba(220,38,38,0.3);box-shadow:0 16px 48px rgba(0,0,0,0.8);"
+     class="flex flex-col rounded-[1.5rem] overflow-hidden">
     <div class="flex items-center justify-between px-5 py-3 border-b border-white/5" style="background:#111;">
         <p class="text-xs font-black uppercase tracking-widest text-red-500">💬 Team Chat</p>
         <button onclick="toggleChat()" class="text-zinc-600 hover:text-white text-lg leading-none transition-colors">✕</button>
     </div>
-
-    <!-- Body: sidebar + messages -->
     <div class="flex flex-1 overflow-hidden">
-        <!-- Agent list sidebar -->
         <div id="chat-agent-list" class="w-32 border-r border-white/5 p-2 overflow-y-auto text-[10px] space-y-0.5" style="background:#0a0a0a;">
             <p class="text-zinc-700 text-[9px] uppercase px-2 py-1">Loading...</p>
         </div>
-
-        <!-- Messages area -->
         <div class="flex-1 flex flex-col" style="background:#0d0d0d;">
             <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-1"></div>
             <div class="flex gap-2 p-3 border-t border-white/5">
                 <input id="chat-input" type="text" placeholder="Message..."
                        class="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-600/50 transition-colors">
-                <button onclick="sendChatMessage()"
-                        class="bg-red-600 hover:bg-red-700 px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all active:scale-95">↑</button>
+                <button onclick="sendChatMessage()" class="bg-red-600 hover:bg-red-700 px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all active:scale-95">&#8593;</button>
             </div>
         </div>
     </div>

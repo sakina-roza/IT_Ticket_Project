@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #050505; color: white; font-family: sans-serif; }
+        body { background: #000000; color: white; font-family: sans-serif; }
         .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(220,38,38,0.2); }
         select option { background: #111; }
         .toast { position:fixed; bottom:1.5rem; right:1.5rem; padding:0.75rem 1.25rem; border-radius:0.75rem;
@@ -66,11 +66,11 @@
                 <p class="text-[9px] text-zinc-700">Tip: More detail helps us resolve faster.</p>
                 <div class="flex gap-3">
                     <button onclick="autoClassify(false)" id="classify-btn"
-                            class="text-[9px] font-bold text-zinc-500 hover:text-red-400 uppercase tracking-widest flex items-center gap-1 transition-colors">
+                            class="text-[9px] font-bold text-zinc-500 hover:text-red-500 uppercase tracking-widest flex items-center gap-1 transition-colors">
                         🔍 KEYWORD CLASSIFY
                     </button>
                     <button onclick="autoClassify(true)" id="ai-classify-btn"
-                            class="text-[9px] font-bold text-red-500 hover:text-red-400 uppercase tracking-widest flex items-center gap-1 transition-colors">
+                            class="text-[9px] font-bold text-red-500 hover:text-red-500 uppercase tracking-widest flex items-center gap-1 transition-colors">
                         ✨ AI CLASSIFY
                     </button>
                 </div>
@@ -78,7 +78,7 @@
         </div>
 
         <!-- AI Suggestion box -->
-        <div id="ai-suggestion" class="hidden bg-blue-950/30 border border-blue-600/20 rounded-xl p-4">
+        <div id="ai-suggestion" class="hidden bg-blue-950/30 border border-red-600/20 rounded-xl p-4">
             <p class="text-[9px] text-blue-400 uppercase font-bold tracking-widest mb-2">AI Suggestion</p>
             <div class="flex gap-6">
                 <div><p class="text-[9px] text-zinc-500">Category</p><p id="ai-cat" class="text-sm font-bold text-white">--</p></div>

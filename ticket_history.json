@@ -1,0 +1,454 @@
+{
+  "TKT0014": [
+    {
+      "timestamp": "2026-04-02 16:40:06",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "assigned",
+      "detail": "Auto-assigned to Agent_A@gmail.com (skill: Network)"
+    },
+    {
+      "timestamp": "2026-04-02 16:47:36",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Closed"
+    },
+    {
+      "timestamp": "2026-04-02 16:47:59",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: Closed → In Progress"
+    },
+    {
+      "timestamp": "2026-04-02 16:48:04",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    },
+    {
+      "timestamp": "2026-04-02 17:02:03",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: Resolved → In Progress"
+    },
+    {
+      "timestamp": "2026-04-02 17:05:05",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    },
+    {
+      "timestamp": "2026-04-02 17:05:07",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: Resolved → In Progress"
+    },
+    {
+      "timestamp": "2026-04-02 17:05:11",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    },
+    {
+      "timestamp": "2026-04-02 17:05:30",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: Resolved → In Progress"
+    },
+    {
+      "timestamp": "2026-04-02 17:05:32",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT0046": [
+    {
+      "timestamp": "2026-04-02 16:40:20",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "assigned",
+      "detail": "Auto-assigned to Agent_A@gmail.com (skill: Security)"
+    },
+    {
+      "timestamp": "2026-04-02 17:06:24",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT0155": [
+    {
+      "timestamp": "2026-04-02 16:40:21",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "assigned",
+      "detail": "Auto-assigned to Agent_A@gmail.com (skill: Hardware)"
+    },
+    {
+      "timestamp": "2026-04-02 17:06:31",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT0136": [
+    {
+      "timestamp": "2026-04-02 16:40:43",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "assigned",
+      "detail": "Auto-assigned to Agent_A@gmail.com (skill: Software)"
+    },
+    {
+      "timestamp": "2026-04-02 17:06:29",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT-20260402-5756": [
+    {
+      "timestamp": "2026-04-02 16:51:11",
+      "actor": "sakina",
+      "actor_email": "malekaroza8765@gmail.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Printer, Priority: Medium. Auto-assigned to Agent_A@gmail.com"
+    },
+    {
+      "timestamp": "2026-04-02 17:06:45",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    },
+    {
+      "timestamp": "2026-04-02 17:06:47",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: Resolved → In Progress"
+    },
+    {
+      "timestamp": "2026-04-02 17:06:49",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT-20260402-1499": [
+    {
+      "timestamp": "2026-04-02 16:51:14",
+      "actor": "sakina",
+      "actor_email": "malekaroza8765@gmail.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Printer, Priority: Medium. Auto-assigned to Agent_A@gmail.com"
+    },
+    {
+      "timestamp": "2026-04-02 17:06:54",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT-20260402-6653": [
+    {
+      "timestamp": "2026-04-02 16:51:17",
+      "actor": "sakina",
+      "actor_email": "malekaroza8765@gmail.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Printer, Priority: Medium. Auto-assigned to Agent_A@gmail.com"
+    },
+    {
+      "timestamp": "2026-04-02 17:06:59",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT-20260402-9102": [
+    {
+      "timestamp": "2026-04-02 16:51:18",
+      "actor": "sakina",
+      "actor_email": "malekaroza8765@gmail.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Printer, Priority: Medium. Auto-assigned to Agent_A@gmail.com"
+    },
+    {
+      "timestamp": "2026-04-02 17:07:04",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT-20260402-3073": [
+    {
+      "timestamp": "2026-04-02 16:51:18",
+      "actor": "sakina",
+      "actor_email": "malekaroza8765@gmail.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Printer, Priority: Medium. Auto-assigned to Agent_A@gmail.com"
+    },
+    {
+      "timestamp": "2026-04-02 17:07:06",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT-20260402-1239": [
+    {
+      "timestamp": "2026-04-02 16:51:31",
+      "actor": "sakina",
+      "actor_email": "malekaroza8765@gmail.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Printer, Priority: Medium. Auto-assigned to Agent_A@gmail.com"
+    },
+    {
+      "timestamp": "2026-04-02 17:07:08",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT-20260402-2009": [
+    {
+      "timestamp": "2026-04-02 16:51:34",
+      "actor": "sakina",
+      "actor_email": "malekaroza8765@gmail.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Printer, Priority: Medium. Auto-assigned to Agent_A@gmail.com"
+    },
+    {
+      "timestamp": "2026-04-02 17:03:24",
+      "actor": "agent_A",
+      "actor_email": "Agent_A@gmail.com",
+      "event": "assigned",
+      "detail": "Transferred from Agent_A@gmail.com to admin@it.com. Reason: No reason given"
+    },
+    {
+      "timestamp": "2026-04-02 17:20:49",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Closed"
+    }
+  ],
+  "TKT0096": [
+    {
+      "timestamp": "2026-04-02 17:11:13",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "assigned",
+      "detail": "Auto-assigned to Agent_A@gmail.com (skill: Software)"
+    },
+    {
+      "timestamp": "2026-04-02 17:53:59",
+      "actor": "Alex Morgan",
+      "actor_email": "agent.alex@it.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT0008": [
+    {
+      "timestamp": "2026-04-02 17:54:16",
+      "actor": "Alex Morgan",
+      "actor_email": "agent.alex@it.com",
+      "event": "updated",
+      "detail": "Status: Closed → In Progress"
+    },
+    {
+      "timestamp": "2026-04-02 17:54:26",
+      "actor": "Alex Morgan",
+      "actor_email": "agent.alex@it.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    },
+    {
+      "timestamp": "2026-04-02 17:54:51",
+      "actor": "Alex Morgan",
+      "actor_email": "agent.alex@it.com",
+      "event": "updated",
+      "detail": "Status: Resolved → Closed"
+    },
+    {
+      "timestamp": "2026-04-02 17:55:01",
+      "actor": "Alex Morgan",
+      "actor_email": "agent.alex@it.com",
+      "event": "updated",
+      "detail": "Status: Closed → In Progress"
+    },
+    {
+      "timestamp": "2026-04-02 17:55:08",
+      "actor": "Alex Morgan",
+      "actor_email": "agent.alex@it.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT0019": [
+    {
+      "timestamp": "2026-04-02 17:55:15",
+      "actor": "Alex Morgan",
+      "actor_email": "agent.alex@it.com",
+      "event": "updated",
+      "detail": "Status: Closed → In Progress"
+    },
+    {
+      "timestamp": "2026-04-02 17:55:22",
+      "actor": "Alex Morgan",
+      "actor_email": "agent.alex@it.com",
+      "event": "updated",
+      "detail": "Status: In Progress → Resolved"
+    }
+  ],
+  "TKT-20260402-8156": [
+    {
+      "timestamp": "2026-04-02 18:07:19",
+      "actor": "sakina",
+      "actor_email": "malekaroza8765@gmail.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Network, Priority: Low. Auto-assigned to agent.dana@it.com by role match."
+    }
+  ],
+  "TKT-20260407-3365": [
+    {
+      "timestamp": "2026-04-07 11:34:27",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Network, Priority: High. Auto-assigned to agent.dana@it.com by role match."
+    },
+    {
+      "timestamp": "2026-04-07 12:21:27",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "created",
+      "detail": "[Merged from TKT-20260407-2344] Ticket created — Category: Network, Priority: High. No matching agent role — queued for admin assignment."
+    },
+    {
+      "timestamp": "2026-04-07 12:21:27",
+      "actor": "System",
+      "actor_email": "system@auto-merge",
+      "event": "merged",
+      "detail": "Auto-merged duplicates: TKT-20260407-2344"
+    }
+  ],
+  "TKT-20260407-6577": [
+    {
+      "timestamp": "2026-04-07 11:35:04",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Network, Priority: High. Auto-assigned to agent.dana@it.com by role match."
+    }
+  ],
+  "TKT-20260407-3487": [
+    {
+      "timestamp": "2026-04-07 12:20:26",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Network, Priority: High. No matching agent role — queued for admin assignment."
+    }
+  ],
+  "TKT0001": [
+    {
+      "timestamp": "2026-04-07 12:20:26",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "updated",
+      "detail": "Status: Resolved → In Progress"
+    },
+    {
+      "timestamp": "2026-04-07 12:21:27",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "updated",
+      "detail": "Priority: Medium → Critical"
+    },
+    {
+      "timestamp": "2026-04-07 12:22:43",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "assigned",
+      "detail": "Transferred from agent.dana@it.com to agent.alex@it.com. Reason: Test transfer"
+    },
+    {
+      "timestamp": "2026-04-07 12:22:43",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "updated",
+      "detail": "Ticket accepted by Admin"
+    },
+    {
+      "timestamp": "2026-04-07 12:45:08",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "attachment",
+      "detail": "File uploaded: test.txt"
+    },
+    {
+      "timestamp": "2026-04-07 12:45:08",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "attachment",
+      "detail": "File uploaded: report.pdf"
+    }
+  ],
+  "TKT-20260407-2344": [
+    {
+      "timestamp": "2026-04-07 12:21:27",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Network, Priority: High. No matching agent role — queued for admin assignment."
+    }
+  ],
+  "TKT-TEST-0001": [
+    {
+      "timestamp": "2026-04-07 12:22:12",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "created",
+      "detail": "Manually added by admin. Priority: Low"
+    }
+  ],
+  "TKT-20260407-2334": [
+    {
+      "timestamp": "2026-04-07 12:38:59",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "created",
+      "detail": "Ticket created — Category: Email, Priority: Low. No matching agent role — queued for admin assignment."
+    }
+  ],
+  "TKT0002": [
+    {
+      "timestamp": "2026-04-07 12:38:59",
+      "actor": "Admin",
+      "actor_email": "admin@it.com",
+      "event": "updated",
+      "detail": "Status: Open → Resolved; Priority: Low → Critical"
+    }
+  ]
+}
